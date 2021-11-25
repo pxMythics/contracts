@@ -1,8 +1,12 @@
+import { task } from "hardhat/config";
+import "@nomiclabs/hardhat-waffle";
+import "hardhat-gas-reporter";
+import "@nomiclabs/hardhat-web3";
+import "@nomiclabs/hardhat-etherscan";
 
-require("@nomiclabs/hardhat-waffle");
+// TODO Change this to Typescript
 require('dotenv').config();
-
-const { API_URL, PRIVATE_KEY, ETHERSCAN_API_KEY } = process.env;
+const { API_URL, PRIVATE_KEY, ETHERSCAN_API_KEY, REPORT_GAS } = process.env;
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -20,6 +24,7 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
+ // TODO Adjust for real deployment
 module.exports = {
   solidity: "0.8.4",
   defaultNetwork: "goerli",
@@ -30,7 +35,7 @@ module.exports = {
     }
   },
   gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
+    enabled: REPORT_GAS ? true : false,
     currency: "USD",
   },
   etherscan: {
