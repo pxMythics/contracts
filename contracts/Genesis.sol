@@ -3,23 +3,26 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
-contract Genesis is ERC721Enumerable, Ownable {
+contract Genesis is ERC721, Ownable {
     using SafeMath for uint256;
     using Counters for Counters.Counter;
 
-    Counters.Counter private _tokenIds;
+    Counters.Counter private _nextTokenId;
 
     // TODO Adjust after testing phase
     uint256 public constant MAX_SUPPLY = 100;
     uint256 public constant PRICE = 0.0000001 ether;
     uint256 public constant MAX_PER_MINT = 5;
+    bool public presaleActive = false;
+    bool public mintActive = false;
+    bool public reservesMinted = false;
 
     string public baseTokenURI;
 
     constructor(string memory baseURI) ERC721("Mythical Sega", "MS") {
+        _nextTokenId.increment();
         setBaseURI(baseURI);
     }
 
@@ -37,13 +40,21 @@ contract Genesis is ERC721Enumerable, Ownable {
         baseTokenURI = _baseTokenURI;
     }
 
+    function flipPresaleActive() public onlyOwner {
+        presaleActive = !presaleActive;
+    }
+
+    function flipMintActive() public onlyOwner {
+        mintActive = !mintActive;
+    }
+
     // TODO Figure out how we want to reserve the NFTs for the team
     function reserveNFTs() public onlyOwner {
-        uint256 totalMinted = _tokenIds.current();
-        require(totalMinted.add(10) < MAX_SUPPLY, "Not enough NFTs");
+        uint256 mintIndex = _nextTokenId.current();
+        require(mintIndex.add(10) < MAX_SUPPLY, "Not enough NFTs");
 
         for (uint256 i = 0; i < 10; i++) {
-            _mintSingleNFT();
+            _safeMint(msg.sender, mintIndex);
         }
     }
 
@@ -51,44 +62,46 @@ contract Genesis is ERC721Enumerable, Ownable {
      * Minting functions
      */
     function mintNFTs(uint256 _count) public payable {
-        uint256 totalMinted = _tokenIds.current();
-        require(totalMinted.add(_count) <= MAX_SUPPLY, "Not enough NFTs!");
-        require(
-            _count > 0 && _count <= MAX_PER_MINT,
-            "Cannot mint specified number of NFTs."
-        );
-        require(
-            msg.value >= PRICE.mul(_count),
-            "Not enough ether to purchase NFTs."
-        );
-        // TODO There is a better to do this than from a loop
+        require(mintActive, "Minting is not active yet!");
+        uint256 mintIndex = _nextTokenId.current();
+        require(mintIndex + _count <= MAX_SUPPLY, "NFTs sold out");
+        require(msg.value >= PRICE * _count, "Not enough ETH");
+
         for (uint256 i = 0; i < _count; i++) {
-            _mintSingleNFT();
+            // TODO Validate this
+            mintIndex = _nextTokenId.current();
+            _nextTokenId.increment();
+            _safeMint(msg.sender, mintIndex);
         }
     }
 
-    function _mintSingleNFT() private {
-        uint256 newTokenID = _tokenIds.current();
-        _safeMint(msg.sender, newTokenID);
-        _tokenIds.increment();
+    function mint() public payable {
+        require(mintActive, "Minting is not active yet!");
+
+        uint256 mintIndex = _nextTokenId.current();
+        require(mintIndex <= MAX_SUPPLY, "NFTs sold out");
+        require(msg.value >= PRICE, "Not enough ETH");
+
+        _nextTokenId.increment();
+        _safeMint(msg.sender, mintIndex);
     }
 
     /**
      * Enumerable
      */
-    function tokensOfOwner(address _owner)
-        external
-        view
-        returns (uint256[] memory)
-    {
-        uint256 tokenCount = balanceOf(_owner);
-        uint256[] memory tokensId = new uint256[](tokenCount);
-        for (uint256 i = 0; i < tokenCount; i++) {
-            tokensId[i] = tokenOfOwnerByIndex(_owner, i);
-        }
+    // function tokensOfOwner(address _owner)
+    //     external
+    //     view
+    //     returns (uint256[] memory)
+    // {
+    //     uint256 tokenCount = balanceOf(_owner);
+    //     uint256[] memory tokensId = new uint256[](tokenCount);
+    //     for (uint256 i = 0; i < tokenCount; i++) {
+    //         tokensId[i] = tokenOfOwnerByIndex(_owner, i);
+    //     }
 
-        return tokensId;
-    }
+    //     return tokensId;
+    // }
 
     /**
      * Withdrawing

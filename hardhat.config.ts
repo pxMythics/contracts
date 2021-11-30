@@ -5,7 +5,7 @@ import "@nomiclabs/hardhat-web3";
 import "@nomiclabs/hardhat-etherscan";
 
 // TODO Change this to Typescript
-require('dotenv').config();
+require("dotenv").config();
 const { API_URL, PRIVATE_KEY, ETHERSCAN_API_KEY, REPORT_GAS } = process.env;
 
 // This is a sample Hardhat task. To learn how to create your own go to
@@ -24,18 +24,19 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
- // TODO Adjust for real deployment
+
+// TODO Adjust for real deployment
 module.exports = {
   solidity: "0.8.4",
   defaultNetwork: "goerli",
   networks: {
     goerli: {
       url: API_URL,
-      accounts: [PRIVATE_KEY]
-    }
+      accounts: [PRIVATE_KEY],
+    },
   },
   gasReporter: {
-    enabled: REPORT_GAS ? true : false,
+    enabled: !!REPORT_GAS,
     currency: "USD",
   },
   etherscan: {
