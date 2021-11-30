@@ -14,6 +14,7 @@ describe("Genesis Contract", () => {
     [owner, address1] = await ethers.getSigners();
   });
 
+  // TODO Adjust with real values
   it("Should initialize the Genesis contract", async () => {
     expect(await contract.MAX_SUPPLY()).to.equal(100);
     expect(await contract.PRICE()).to.equal(utils.parseEther("0.0000001"));
