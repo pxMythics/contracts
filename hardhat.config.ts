@@ -1,10 +1,11 @@
-import { task } from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
-import "hardhat-gas-reporter";
-import "@nomiclabs/hardhat-web3";
+import "@appliedblockchain/chainlink-plugins-fund-link";
 import "@nomiclabs/hardhat-etherscan";
-import dotenv from "dotenv";
+import "@nomiclabs/hardhat-waffle";
+import "@nomiclabs/hardhat-web3";
 import "hardhat-deploy";
+import "hardhat-gas-reporter";
+import dotenv from "dotenv";
+import { task } from "hardhat/config";
 
 dotenv.config();
 const { API_URL, PRIVATE_KEY, ETHERSCAN_API_KEY, REPORT_GAS } = process.env;
