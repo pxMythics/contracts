@@ -4,26 +4,65 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
-contract Genesis is ERC721, Ownable {
+contract Genesis is ERC721, VRFConsumerBase, Ownable {
+    enum TokenType {
+        GOD,
+        DEMIGOD,
+        ELEMENTAL
+    }
     using SafeMath for uint256;
     using Counters for Counters.Counter;
+
+    // Chainlink
+    bytes32 internal keyHash;
+    uint256 internal fee;
+    uint256 public randomResult;
+    address public VRFCoordinator;
+    address public LinkToken;
+    mapping(bytes32 => address) public requestIdToSender;
+    mapping(uint256 => uint256) public tokenIdToRandomNumber;
+    mapping(bytes32 => uint256) public requestIdToTokenId;
 
     Counters.Counter private _nextTokenId;
 
     // TODO Adjust after testing phase
     uint256 public constant MAX_SUPPLY = 100;
     uint256 public constant PRICE = 0.0000001 ether;
-    uint256 public constant MAX_PER_MINT = 5;
+    uint256 public constant MAX_PER_MINT = 2;
     bool public presaleActive = false;
     bool public mintActive = false;
     bool public reservesMinted = false;
-
     string public baseTokenURI;
 
-    constructor(string memory baseURI) ERC721("Mythical Sega", "MS") {
+    /**
+     * Collection properties
+     */
+    // Gods
+    uint256 private godsCount = 50;
+
+    // Demi-Gods
+    uint256 private demiGodsCount = 400;
+
+    // Elementals
+    uint256 private elementalsCount = 550;
+
+    constructor(
+        address _VRFCoordinator,
+        address _LinkToken,
+        bytes32 _keyhash,
+        string memory baseURI
+    )
+        VRFConsumerBase(_VRFCoordinator, _LinkToken)
+        ERC721("Mythical Sega", "MS")
+    {
         _nextTokenId.increment();
         setBaseURI(baseURI);
+        VRFCoordinator = _VRFCoordinator;
+        LinkToken = _LinkToken;
+        keyHash = _keyhash;
+        fee = 0.1 * 10**18; // 0.1 LINK
     }
 
     /**
@@ -59,6 +98,19 @@ contract Genesis is ERC721, Ownable {
     }
 
     /**
+     * VRFConsumerBase
+     */
+    function fulfillRandomness(bytes32 requestId, uint256 randomNumber)
+        internal
+        override
+    {
+        address nftOwner = requestIdToSender[requestId];
+        uint256 tokenId = requestIdToTokenId[requestId];
+        _safeMint(nftOwner, tokenId);
+        tokenIdToRandomNumber[tokenId] = randomNumber;
+    }
+
+    /**
      * Minting functions
      */
     function mintNFTs(uint256 _count) public payable {
@@ -71,7 +123,7 @@ contract Genesis is ERC721, Ownable {
             // TODO Validate this
             mintIndex = _nextTokenId.current();
             _nextTokenId.increment();
-            _safeMint(msg.sender, mintIndex);
+            generateRandomProperties(mintIndex);
         }
     }
 
@@ -83,7 +135,16 @@ contract Genesis is ERC721, Ownable {
         require(msg.value >= PRICE, "Not enough ETH");
 
         _nextTokenId.increment();
-        _safeMint(msg.sender, mintIndex);
+        generateRandomProperties(mintIndex);
+    }
+
+    function generateRandomProperties(uint256 _tokenId)
+        internal
+        returns (bytes32 requestId)
+    {
+        requestId = requestRandomness(keyHash, fee);
+        requestIdToSender[requestId] = msg.sender;
+        requestIdToTokenId[requestId] = _tokenId;
     }
 
     /**

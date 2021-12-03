@@ -1,13 +1,25 @@
-import { Contract } from "ethers";
-import { ethers } from "hardhat";
+import { deployments } from "hardhat";
+import { Deployment } from "hardhat-deploy/dist/types";
 
 export const deployTestContract = async (
   baseURI: string = "ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/",
-): Promise<Contract> => {
-  const Genesis = await ethers.getContractFactory("Genesis");
-  const genesis = await Genesis.deploy(baseURI);
+): Promise<{
+  contract: Deployment;
+  linkToken: Deployment;
+  vrfCoordinator: Deployment;
+}> => {
+  const LinkToken: Deployment = await deployments.get("LinkToken");
+  const VRFCoordinatorMock: Deployment = await deployments.get(
+    "VRFCoordinatorMock",
+  );
 
-  return await genesis.deployed();
+  const Genesis: Deployment = await deployments.get("Genesis");
+
+  return {
+    contract: Genesis,
+    linkToken: LinkToken,
+    vrfCoordinator: VRFCoordinatorMock,
+  };
 };
 
 export const addressZero = (): string =>

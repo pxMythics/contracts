@@ -4,7 +4,6 @@ exports/
 node_modules/
 types/
 typechain
-package-lock.json
 coverage.json
 .env
 .DS_Store
