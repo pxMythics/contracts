@@ -1,12 +1,12 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { utils } from "ethers";
+import { Contract, utils } from "ethers";
 import { ethers, run } from "hardhat";
 import { Deployment } from "hardhat-deploy/dist/types";
 import { addressZero, deployTestContract } from "./test-utils";
 
 describe("Genesis Contract", () => {
-  let contract: Deployment;
+  let contract: Contract;
   let LinkToken: Deployment;
   let VRFCoordinatorMock: Deployment;
   let owner: SignerWithAddress;
@@ -17,7 +17,9 @@ describe("Genesis Contract", () => {
     contract = deployedContracts.contract;
     LinkToken = deployedContracts.linkToken;
     VRFCoordinatorMock = deployedContracts.vrfCoordinator;
-    [owner, address1] = await ethers.getSigners();
+    const signers = await ethers.getSigners();
+    owner = signers[9];
+    address1 = signers[0];
   });
 
   // TODO Adjust with real values
@@ -44,7 +46,7 @@ describe("Genesis Contract", () => {
   });
 
   it("Should allow minting if it is active", async function () {
-    await contract.flipMintActive();
+    await contract.connect(owner).flipMintActive();
     await run("fund-link", {
       contract: contract.address,
       linkaddress: LinkToken.address,

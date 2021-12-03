@@ -1,6 +1,7 @@
 abi/
 coverage/
 exports/
+deployments/
 node_modules/
 types/
 typechain
