@@ -9,6 +9,7 @@ const deployMocks: DeployFunction = async function (
   const { deploy, log } = deployments;
   const { deployer } = await getNamedAccounts();
   const chainId = await getChainId();
+
   if (chainId === "31337") {
     log(`Deploying chainlink mocks to chainId: ${chainId}`);
     const linkToken = await deploy("LinkToken", {

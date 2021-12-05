@@ -1,9 +1,14 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { Contract, utils } from "ethers";
-import { ethers, run } from "hardhat";
+import { ethers, getChainId } from "hardhat";
 import { Deployment } from "hardhat-deploy/dist/types";
 import { addressZero, deployTestContract } from "./test-utils";
+import { networkConfig } from "../helper-hardhat-config";
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 describe("Genesis Contract", () => {
   let contract: Contract;
@@ -11,6 +16,8 @@ describe("Genesis Contract", () => {
   let VRFCoordinatorMock: Deployment;
   let owner: SignerWithAddress;
   let address1: SignerWithAddress;
+  let oracle: SignerWithAddress;
+  const randomNumber = 777;
 
   beforeEach(async () => {
     const deployedContracts = await deployTestContract();
@@ -20,6 +27,10 @@ describe("Genesis Contract", () => {
     const signers = await ethers.getSigners();
     owner = signers[9];
     address1 = signers[0];
+    oracle = signers[1];
+    console.log(
+      `signers are owner: ${owner.address} address1: ${address1.address}`,
+    );
   });
 
   // TODO Adjust with real values
@@ -47,14 +58,32 @@ describe("Genesis Contract", () => {
 
   it("Should allow minting if it is active", async function () {
     await contract.connect(owner).flipMintActive();
-    await run("fund-link", {
-      contract: contract.address,
-      linkaddress: LinkToken.address,
+    expect(await contract.mintActive()).to.be.true;
+    // let upKeepResponse = await contract.checkUpkeep("0x");
+    // expect(upKeepResponse[0]).to.equal(false);
+    // const chainId = await getChainId();
+    // const sleepTime = parseInt(networkConfig[chainId].interval) * 1000;
+    // await sleep(sleepTime); // we need to wait out the interval!
+    // upKeepResponse = await contract.checkUpkeep("0x");
+    // expect(upKeepResponse[0]).to.equal(true);
+    const performTx = await contract.performUpkeep("0x");
+    const performReceipt = await performTx.wait();
+
+    await contract.connect(address1).mint({
+      value: ethers.utils.parseEther("0.0000001"),
     });
+
+    const vrfCoordinatorMock = await ethers.getContractAt(
+      "VRFCoordinatorMock",
+      VRFCoordinatorMock.address,
+      oracle,
+    );
     await expect(
-      contract.connect(address1).mint({
-        value: ethers.utils.parseEther("0.0000001"),
-      }),
+      vrfCoordinatorMock.callBackWithRandomness(
+        performReceipt.events![2].topics[1],
+        randomNumber,
+        contract.address,
+      ),
     )
       .to.emit(contract, "Transfer")
       .withArgs(addressZero(), address1.address, 1);

@@ -5,8 +5,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
+import "hardhat/console.sol";
 
-contract Genesis is ERC721, VRFConsumerBase, Ownable {
+contract Genesis is
+    ERC721,
+    VRFConsumerBase,
+    Ownable,
+    KeeperCompatibleInterface
+{
     enum TokenType {
         GOD,
         DEMIGOD,
@@ -21,6 +28,8 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     uint256 public randomResult;
     address public VRFCoordinator;
     address public LinkToken;
+    uint256 public lastTimeStamp;
+    uint256 public interval;
     mapping(bytes32 => address) public requestIdToSender;
     mapping(uint256 => uint256) public tokenIdToRandomNumber;
     mapping(bytes32 => uint256) public requestIdToTokenId;
@@ -52,11 +61,14 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
         address _VRFCoordinator,
         address _LinkToken,
         bytes32 _keyhash,
-        string memory baseURI
+        string memory baseURI,
+        uint256 _interval
     )
         VRFConsumerBase(_VRFCoordinator, _LinkToken)
         ERC721("Mythical Sega", "MS")
     {
+        lastTimeStamp = block.timestamp;
+        interval = _interval;
         _nextTokenId.increment();
         setBaseURI(baseURI);
         VRFCoordinator = _VRFCoordinator;
@@ -104,10 +116,13 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
         internal
         override
     {
+        console.log("Got randomness for %d", randomNumber);
         address nftOwner = requestIdToSender[requestId];
         uint256 tokenId = requestIdToTokenId[requestId];
+        console.log("Will now mint");
         _safeMint(nftOwner, tokenId);
         tokenIdToRandomNumber[tokenId] = randomNumber;
+        console.log("Did mint");
     }
 
     /**
@@ -127,24 +142,75 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
         }
     }
 
-    function mint() public payable {
-        require(mintActive, "Minting is not active yet!");
+    function mint() public payable returns (bytes32) {
+        console.log("Trying to mint...");
+        // require(mintActive, "Minting is not active yet!");
 
         uint256 mintIndex = _nextTokenId.current();
         require(mintIndex <= MAX_SUPPLY, "NFTs sold out");
         require(msg.value >= PRICE, "Not enough ETH");
 
+        console.log("Passing mint requirements");
         _nextTokenId.increment();
-        generateRandomProperties(mintIndex);
+        bytes32 requestId = requestRandomness(keyHash, fee);
+        requestIdToSender[requestId] = msg.sender;
+        requestIdToTokenId[requestId] = mintIndex;
+        console.log("Request id is:");
+        console.logBytes32(requestId);
+        return requestId;
     }
 
     function generateRandomProperties(uint256 _tokenId)
         internal
         returns (bytes32 requestId)
     {
+        console.log("Requesting randomness for %s", _tokenId);
         requestId = requestRandomness(keyHash, fee);
         requestIdToSender[requestId] = msg.sender;
         requestIdToTokenId[requestId] = _tokenId;
+    }
+
+    /**
+     * @dev This is the function that the Chainlink Keeper nodes call
+     * they look for `upkeepNeeded` to return True
+     * the following should be true for this to return true:
+     * 1. The time interval has passed between raffle runs
+     * 2. The contract has LINK
+     * 3. The contract has ETH
+     */
+    function checkUpkeep(
+        bytes memory /* checkData */
+    )
+        public
+        view
+        override
+        returns (
+            bool upkeepNeeded,
+            bytes memory /* performData */
+        )
+    {
+        bool hasLink = LINK.balanceOf(address(this)) >= fee;
+        // TODO Add check state
+        // bool isOpen = raffleState.OPEN == s_raffleState;
+        upkeepNeeded = (((block.timestamp - lastTimeStamp) > interval) &&
+            // isOpen &&
+            hasLink &&
+            (address(this).balance >= 0));
+    }
+
+    /**
+     * @dev Once `checkUpkeep` is returning `true`, this function is called
+     * and it kicks off a Chainlink VRF call to get a random winner
+     */
+    function performUpkeep(
+        bytes calldata /* performData */
+    ) external override {
+        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
+        require(address(this).balance >= 0, "Not enough ETH");
+        (bool upkeepNeeded, ) = checkUpkeep("");
+        require(upkeepNeeded, "Upkeep not needed");
+        lastTimeStamp = block.timestamp;
+        bytes32 requestId = requestRandomness(keyHash, fee);
     }
 
     /**

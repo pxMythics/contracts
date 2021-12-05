@@ -2,9 +2,11 @@ import "@appliedblockchain/chainlink-plugins-fund-link";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-web3";
+import "@typechain/hardhat";
 import "hardhat-deploy";
 import "hardhat-ethernal";
 import "hardhat-gas-reporter";
+import "solidity-coverage";
 import dotenv from "dotenv";
 import { task } from "hardhat/config";
 
@@ -43,7 +45,7 @@ module.exports = {
       },
     ],
   },
-  defaultNetwork: "goerli",
+  defaultNetwork: "localhost",
   networks: {
     goerli: {
       url: API_URL,
