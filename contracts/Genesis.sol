@@ -5,15 +5,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
 import "hardhat/console.sol";
 
-contract Genesis is
-    ERC721,
-    VRFConsumerBase,
-    Ownable,
-    KeeperCompatibleInterface
-{
+contract Genesis is ERC721, VRFConsumerBase, Ownable {
     enum TokenType {
         GOD,
         DEMIGOD,
@@ -25,14 +19,11 @@ contract Genesis is
     // Chainlink
     bytes32 internal keyHash;
     uint256 internal fee;
-    uint256 public randomResult;
     address public VRFCoordinator;
     address public LinkToken;
-    uint256 public lastTimeStamp;
-    uint256 public interval;
     mapping(bytes32 => address) public requestIdToSender;
-    mapping(uint256 => uint256) public tokenIdToRandomNumber;
     mapping(bytes32 => uint256) public requestIdToTokenId;
+    event RequestedRandomNFT(bytes32 indexed requestId);
 
     Counters.Counter private _nextTokenId;
 
@@ -49,26 +40,25 @@ contract Genesis is
      * Collection properties
      */
     // Gods
-    uint256 private godsCount = 50;
+    uint256 private godsCount = 5;
 
     // Demi-Gods
-    uint256 private demiGodsCount = 400;
+    uint256 private demiGodsCount = 40;
 
     // Elementals
-    uint256 private elementalsCount = 550;
+    uint256 private elementalsCount = 55;
+    // TODO: This should have the traits if we want everything on chain
+    mapping(uint256 => TokenType) public tokenIdToTokenType;
 
     constructor(
         address _VRFCoordinator,
         address _LinkToken,
         bytes32 _keyhash,
-        string memory baseURI,
-        uint256 _interval
+        string memory baseURI
     )
         VRFConsumerBase(_VRFCoordinator, _LinkToken)
         ERC721("Mythical Sega", "MS")
     {
-        lastTimeStamp = block.timestamp;
-        interval = _interval;
         _nextTokenId.increment();
         setBaseURI(baseURI);
         VRFCoordinator = _VRFCoordinator;
@@ -116,18 +106,20 @@ contract Genesis is
         internal
         override
     {
-        console.log("Got randomness for %d", randomNumber);
         address nftOwner = requestIdToSender[requestId];
         uint256 tokenId = requestIdToTokenId[requestId];
-        console.log("Will now mint");
-        _safeMint(nftOwner, tokenId);
-        tokenIdToRandomNumber[tokenId] = randomNumber;
-        console.log("Did mint");
+        require(
+            _nextTokenId.current() > tokenId,
+            "TokenId has not been minted yet!"
+        );
+        _mint(nftOwner, tokenId);
+        tokenIdToTokenType[tokenId] = generateRandomTraits(randomNumber);
     }
 
     /**
      * Minting functions
      */
+    // TODO Update function to properly use the requests
     function mintNFTs(uint256 _count) public payable {
         require(mintActive, "Minting is not active yet!");
         uint256 mintIndex = _nextTokenId.current();
@@ -138,79 +130,61 @@ contract Genesis is
             // TODO Validate this
             mintIndex = _nextTokenId.current();
             _nextTokenId.increment();
-            generateRandomProperties(mintIndex);
+            requestRandomNumberForTokenId(mintIndex);
         }
     }
 
     function mint() public payable returns (bytes32) {
-        console.log("Trying to mint...");
-        // require(mintActive, "Minting is not active yet!");
-
+        require(mintActive, "Minting is not active yet!");
         uint256 mintIndex = _nextTokenId.current();
         require(mintIndex <= MAX_SUPPLY, "NFTs sold out");
         require(msg.value >= PRICE, "Not enough ETH");
 
-        console.log("Passing mint requirements");
         _nextTokenId.increment();
-        bytes32 requestId = requestRandomness(keyHash, fee);
-        requestIdToSender[requestId] = msg.sender;
-        requestIdToTokenId[requestId] = mintIndex;
-        console.log("Request id is:");
-        console.logBytes32(requestId);
+        bytes32 requestId = requestRandomNumberForTokenId(mintIndex);
+        emit RequestedRandomNFT(requestId);
         return requestId;
     }
 
-    function generateRandomProperties(uint256 _tokenId)
+    function requestRandomNumberForTokenId(uint256 _tokenId)
         internal
         returns (bytes32 requestId)
     {
-        console.log("Requesting randomness for %s", _tokenId);
+        require(
+            LINK.balanceOf(address(this)) >= fee,
+            "Not enough LINK - fill contract with faucet"
+        );
         requestId = requestRandomness(keyHash, fee);
         requestIdToSender[requestId] = msg.sender;
         requestIdToTokenId[requestId] = _tokenId;
+        return requestId;
     }
 
     /**
-     * @dev This is the function that the Chainlink Keeper nodes call
-     * they look for `upkeepNeeded` to return True
-     * the following should be true for this to return true:
-     * 1. The time interval has passed between raffle runs
-     * 2. The contract has LINK
-     * 3. The contract has ETH
+     * Randomization
      */
-    function checkUpkeep(
-        bytes memory /* checkData */
-    )
-        public
-        view
-        override
-        returns (
-            bool upkeepNeeded,
-            bytes memory /* performData */
-        )
+    function generateRandomTraits(uint256 _randomNumber)
+        private
+        returns (TokenType genesisType)
     {
-        bool hasLink = LINK.balanceOf(address(this)) >= fee;
-        // TODO Add check state
-        // bool isOpen = raffleState.OPEN == s_raffleState;
-        upkeepNeeded = (((block.timestamp - lastTimeStamp) > interval) &&
-            // isOpen &&
-            hasLink &&
-            (address(this).balance >= 0));
-    }
-
-    /**
-     * @dev Once `checkUpkeep` is returning `true`, this function is called
-     * and it kicks off a Chainlink VRF call to get a random winner
-     */
-    function performUpkeep(
-        bytes calldata /* performData */
-    ) external override {
-        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
-        require(address(this).balance >= 0, "Not enough ETH");
-        (bool upkeepNeeded, ) = checkUpkeep("");
-        require(upkeepNeeded, "Upkeep not needed");
-        lastTimeStamp = block.timestamp;
-        bytes32 requestId = requestRandomness(keyHash, fee);
+        require(
+            godsCount + demiGodsCount + elementalsCount > 0,
+            "All NFTs have been generated"
+        );
+        uint256 totalCountLeft = godsCount + demiGodsCount + elementalsCount;
+        // Here we add 1 because we use the counts to define the type. If a count is at 0, we ignore it.
+        // That's why we don't ever want the modulo to return 0.
+        uint256 randomTypeIndex = (_randomNumber % totalCountLeft) + 1;
+        if (randomTypeIndex <= godsCount) {
+            godsCount = godsCount.sub(1);
+            return TokenType.GOD;
+        } else if (randomTypeIndex <= godsCount + demiGodsCount) {
+            demiGodsCount = demiGodsCount.sub(1);
+            return TokenType.DEMIGOD;
+        } else {
+            elementalsCount = elementalsCount.sub(1);
+            return TokenType.ELEMENTAL;
+        }
     }
 
     /**

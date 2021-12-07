@@ -23,7 +23,6 @@ const deployRaffle: DeployFunction = async function (
   const linkTokenAddress = linkToken.address;
   const vrfCoordinatorAddress = VRFCoordinatorMock.address;
   const keyHash: string = networkConfig[chainId].keyHash;
-  const interval: string = networkConfig[chainId].interval;
 
   const genesis = await deploy("Genesis", {
     from: deployer,
@@ -32,7 +31,6 @@ const deployRaffle: DeployFunction = async function (
       linkTokenAddress,
       keyHash,
       "ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/",
-      interval,
     ],
     log: true,
   });

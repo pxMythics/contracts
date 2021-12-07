@@ -6,10 +6,6 @@ import { Deployment } from "hardhat-deploy/dist/types";
 import { addressZero, deployTestContract } from "./test-utils";
 import { networkConfig } from "../helper-hardhat-config";
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 describe("Genesis Contract", () => {
   let contract: Contract;
   let LinkToken: Deployment;
@@ -48,10 +44,10 @@ describe("Genesis Contract", () => {
   });
 
   it("Should not allow minting if it is not active", async function () {
-    await expect(contract.mint()).to.be.revertedWith(
+    await expect(contract.connect(address1).mint()).to.be.revertedWith(
       "Minting is not active yet!",
     );
-    await expect(contract.mintNFTs(5)).to.be.revertedWith(
+    await expect(contract.connect(owner).mintNFTs(5)).to.be.revertedWith(
       "Minting is not active yet!",
     );
   });
@@ -59,33 +55,64 @@ describe("Genesis Contract", () => {
   it("Should allow minting if it is active", async function () {
     await contract.connect(owner).flipMintActive();
     expect(await contract.mintActive()).to.be.true;
-    // let upKeepResponse = await contract.checkUpkeep("0x");
-    // expect(upKeepResponse[0]).to.equal(false);
-    // const chainId = await getChainId();
-    // const sleepTime = parseInt(networkConfig[chainId].interval) * 1000;
-    // await sleep(sleepTime); // we need to wait out the interval!
-    // upKeepResponse = await contract.checkUpkeep("0x");
-    // expect(upKeepResponse[0]).to.equal(true);
-    const performTx = await contract.performUpkeep("0x");
-    const performReceipt = await performTx.wait();
 
-    await contract.connect(address1).mint({
+    const mintTx = await contract.connect(address1).mint({
       value: ethers.utils.parseEther("0.0000001"),
     });
+    const mintReceipt = await mintTx.wait();
+    const requestId = mintReceipt.events?.find(
+      (x: any) => x.event === "RequestedRandomNFT",
+    ).args[0];
 
     const vrfCoordinatorMock = await ethers.getContractAt(
       "VRFCoordinatorMock",
       VRFCoordinatorMock.address,
       oracle,
     );
+
     await expect(
       vrfCoordinatorMock.callBackWithRandomness(
-        performReceipt.events![2].topics[1],
+        requestId,
         randomNumber,
         contract.address,
       ),
     )
       .to.emit(contract, "Transfer")
       .withArgs(addressZero(), address1.address, 1);
+  });
+
+  it("Testing complete mint", async function () {
+    await contract.connect(owner).flipMintActive();
+    expect(await contract.mintActive()).to.be.true;
+
+    console.log("Result of mint is:");
+    for (let i = 0; i < 100; i++) {
+      const mintTx = await contract.connect(address1).mint({
+        value: ethers.utils.parseEther("0.0000001"),
+      });
+      const mintReceipt = await mintTx.wait();
+      const requestId = mintReceipt.events?.find(
+        (x: any) => x.event === "RequestedRandomNFT",
+      ).args[0];
+
+      const vrfCoordinatorMock = await ethers.getContractAt(
+        "VRFCoordinatorMock",
+        VRFCoordinatorMock.address,
+        oracle,
+      );
+
+      await expect(
+        vrfCoordinatorMock.callBackWithRandomness(
+          requestId,
+          Math.floor(Math.random() * 100000),
+          contract.address,
+        ),
+      )
+        .to.emit(contract, "Transfer")
+        .withArgs(addressZero(), address1.address, (i + 1).toString());
+
+      const tokenType = await contract.tokenIdToTokenType(i + 1);
+      console.log(`${i + 1},${tokenType}`);
+    }
   });
 });
