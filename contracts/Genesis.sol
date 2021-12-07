@@ -21,8 +21,8 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     uint256 internal fee;
     address public VRFCoordinator;
     address public LinkToken;
-    mapping(bytes32 => address) public requestIdToSender;
-    mapping(bytes32 => uint256) public requestIdToTokenId;
+    mapping(bytes32 => address) internal requestIdToSender;
+    mapping(bytes32 => uint256) internal requestIdToTokenId;
     event RequestedRandomNFT(bytes32 indexed requestId);
 
     Counters.Counter private _nextTokenId;
@@ -30,11 +30,16 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     // TODO Adjust after testing phase
     uint256 public constant MAX_SUPPLY = 1000;
     uint256 public constant PRICE = 0.0000001 ether;
-    uint256 public constant MAX_PER_MINT = 2;
+    uint256 public constant MAX_PER_MINT = 1;
     bool public presaleActive = false;
     bool public mintActive = false;
     bool public reservesMinted = false;
     string public baseTokenURI;
+
+    /**
+     * Minting properties
+     */
+    mapping(address => uint256) private addressToMintCount;
 
     /**
      * Collection properties
@@ -120,6 +125,7 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
      * Minting functions
      */
     // TODO Update function to properly use the requests
+    // TODO: Add logic for the reserved spots
     function mintNFTs(uint256 _count) public payable {
         require(mintActive, "Minting is not active yet!");
         uint256 mintIndex = _nextTokenId.current();
@@ -134,14 +140,20 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
         }
     }
 
+    // TODO: Add logic for the reserved spots
     function mint() public payable returns (bytes32) {
         require(mintActive, "Minting is not active yet!");
         uint256 mintIndex = _nextTokenId.current();
         require(mintIndex <= MAX_SUPPLY, "NFTs sold out");
         require(msg.value >= PRICE, "Not enough ETH");
+        require(
+            addressToMintCount[msg.sender] < MAX_PER_MINT,
+            "No more minting spot left"
+        );
 
         _nextTokenId.increment();
         bytes32 requestId = requestRandomNumberForTokenId(mintIndex);
+        addressToMintCount[msg.sender] = addressToMintCount[msg.sender].add(1);
         emit RequestedRandomNFT(requestId);
         return requestId;
     }
