@@ -80,39 +80,4 @@ describe("Genesis Contract", () => {
       .to.emit(contract, "Transfer")
       .withArgs(addressZero(), address1.address, 1);
   });
-
-  it("Testing complete mint", async function () {
-    await contract.connect(owner).flipMintActive();
-    expect(await contract.mintActive()).to.be.true;
-
-    console.log("Result of mint is:");
-    for (let i = 0; i < 100; i++) {
-      const mintTx = await contract.connect(address1).mint({
-        value: ethers.utils.parseEther("0.0000001"),
-      });
-      const mintReceipt = await mintTx.wait();
-      const requestId = mintReceipt.events?.find(
-        (x: any) => x.event === "RequestedRandomNFT",
-      ).args[0];
-
-      const vrfCoordinatorMock = await ethers.getContractAt(
-        "VRFCoordinatorMock",
-        VRFCoordinatorMock.address,
-        oracle,
-      );
-
-      await expect(
-        vrfCoordinatorMock.callBackWithRandomness(
-          requestId,
-          Math.floor(Math.random() * 100000),
-          contract.address,
-        ),
-      )
-        .to.emit(contract, "Transfer")
-        .withArgs(addressZero(), address1.address, (i + 1).toString());
-
-      const tokenType = await contract.tokenIdToTokenType(i + 1);
-      console.log(`${i + 1},${tokenType}`);
-    }
-  });
 });

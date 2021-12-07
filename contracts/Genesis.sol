@@ -28,7 +28,7 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     Counters.Counter private _nextTokenId;
 
     // TODO Adjust after testing phase
-    uint256 public constant MAX_SUPPLY = 100;
+    uint256 public constant MAX_SUPPLY = 1000;
     uint256 public constant PRICE = 0.0000001 ether;
     uint256 public constant MAX_PER_MINT = 2;
     bool public presaleActive = false;
@@ -40,13 +40,13 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
      * Collection properties
      */
     // Gods
-    uint256 private godsCount = 5;
+    uint256 private godsCount = 50;
 
     // Demi-Gods
-    uint256 private demiGodsCount = 40;
+    uint256 private demiGodsCount = 400;
 
     // Elementals
-    uint256 private elementalsCount = 55;
+    uint256 private elementalsCount = 550;
     // TODO: This should have the traits if we want everything on chain
     mapping(uint256 => TokenType) public tokenIdToTokenType;
 

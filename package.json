@@ -6,7 +6,8 @@
     "ethernal:login": "ethernal login",
     "ethernal:listen": "ethernal listen",
     "node:local": "hardhat node --network hardhat",
-    "test": "hardhat test --deploy-fixture --network localhost"
+    "test": "hardhat test --deploy-fixture --network localhost",
+    "test:full-mint": "hardhat test --deploy-fixture --network localhost ./test/test-mint.ts"
   },
   "repository": {
     "type": "git",
