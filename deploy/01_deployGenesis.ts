@@ -1,9 +1,8 @@
-/* eslint-disable node/no-unpublished-import */
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-// eslint-disable-next-line node/no-missing-import
 import { DeployFunction } from "hardhat-deploy/types";
 import { Deployment } from "hardhat-deploy/dist/types";
 import { networkConfig } from "../helper-hardhat-config";
+import "hardhat-ethernal";
 
 const deployRaffle: DeployFunction = async function (
   hre: HardhatRuntimeEnvironment,
@@ -39,6 +38,10 @@ const deployRaffle: DeployFunction = async function (
       "ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/",
     ],
     log: true,
+  });
+  await hre.ethernal.push({
+    name: "Genesis",
+    address: genesis.address,
   });
   const networkWorkName: string = networkConfig[chainId].name;
 

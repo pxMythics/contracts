@@ -1,5 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
+import "hardhat-ethernal";
 
 const deployMocks: DeployFunction = async function (
   hre: HardhatRuntimeEnvironment,
@@ -15,10 +16,18 @@ const deployMocks: DeployFunction = async function (
       args: [],
       log: true,
     });
-    await deploy("VRFCoordinatorMock", {
+    await hre.ethernal.push({
+      name: "LinkToken",
+      address: linkToken.address,
+    });
+    const vrfCoordinatorMock = await deploy("VRFCoordinatorMock", {
       from: deployer,
       log: true,
       args: [linkToken.address],
+    });
+    await hre.ethernal.push({
+      name: "VRFCoordinatorMock",
+      address: vrfCoordinatorMock.address,
     });
     log("Chainlink mocks deployed ");
   }

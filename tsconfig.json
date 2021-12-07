@@ -5,8 +5,9 @@
     "strict": true,
     "esModuleInterop": true,
     "outDir": "dist",
-    "declaration": true
+    "declaration": true,
+    "moduleResolution": "node",
   },
-  "include": ["./hardhat.config.ts", "./scripts", "./test", "./typechain"],
+  "include": ["./scripts", "./test", "./deploy"],
   "files": ["./hardhat.config.ts"]
 }

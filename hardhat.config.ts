@@ -3,6 +3,7 @@ import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-web3";
 import "hardhat-deploy";
+import "hardhat-ethernal";
 import "hardhat-gas-reporter";
 import dotenv from "dotenv";
 import { task } from "hardhat/config";
@@ -12,7 +13,7 @@ const { API_URL, PRIVATE_KEY, ETHERSCAN_API_KEY, REPORT_GAS } = process.env;
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
-task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
+task("accounts", "Prints the list of accounts", async (_taskArgs, hre: any) => {
   const accounts = await hre.ethers.getSigners();
 
   for (const account of accounts) {
