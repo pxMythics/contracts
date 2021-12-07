@@ -6,12 +6,12 @@ const deployMocks: DeployFunction = async function (
   hre: HardhatRuntimeEnvironment,
 ) {
   const { deployments, getNamedAccounts, getChainId } = hre;
-  const { deploy, log } = deployments;
+  const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
   const chainId = await getChainId();
 
   if (chainId === "31337") {
-    log(`Deploying chainlink mocks to chainId: ${chainId}`);
+    console.log(`Deploying chainlink mocks to chainId: ${chainId}`);
     const linkToken = await deploy("LinkToken", {
       from: deployer,
       args: [],
@@ -30,7 +30,7 @@ const deployMocks: DeployFunction = async function (
       name: "VRFCoordinatorMock",
       address: vrfCoordinatorMock.address,
     });
-    log("Chainlink mocks deployed ");
+    console.log("Chainlink mocks deployed ");
   }
 };
 export default deployMocks;

@@ -3,30 +3,30 @@ import { expect } from "chai";
 import { Contract } from "ethers";
 import { ethers } from "hardhat";
 import { Deployment } from "hardhat-deploy/dist/types";
-import { addressZero, deployTestContract } from "./test-utils";
+import {
+  addressZero,
+  deployTestContract,
+  addLinkFundIfNeeded,
+} from "./test-utils";
 import fs from "fs";
 
 describe("Genesis full minting function", function () {
   let contract: Contract;
-  let LinkToken: Deployment;
   let VRFCoordinatorMock: Deployment;
   let owner: SignerWithAddress;
   let address1: SignerWithAddress;
   let oracle: SignerWithAddress;
-  const randomNumber = 777;
 
   beforeEach(async () => {
-    const deployedContracts = await deployTestContract();
-    contract = deployedContracts.contract;
-    LinkToken = deployedContracts.linkToken;
-    VRFCoordinatorMock = deployedContracts.vrfCoordinator;
     const signers = await ethers.getSigners();
     owner = signers[9];
     address1 = signers[0];
     oracle = signers[1];
-    console.log(
-      `signers are owner: ${owner.address} address1: ${address1.address}`,
-    );
+    const deployedContracts = await deployTestContract(owner);
+    contract = deployedContracts.contract;
+    VRFCoordinatorMock = deployedContracts.vrfCoordinator;
+    // TODO: Perhaps this should be only applied on test where it is needed cause it creates a transaction each time
+    await addLinkFundIfNeeded(contract, owner);
   });
 
   this.timeout(5000000);

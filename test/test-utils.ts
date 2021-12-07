@@ -56,11 +56,13 @@ export const addLinkFundIfNeeded = async (
 
   const balance = await link.balanceOf(genesis.address);
   if (balance.lte(0)) {
+    console.log("Will add funds to genesis");
     const receipt = await link.transfer(
       genesis.address,
       "1000000000000000000000000000000",
     );
     await receipt.wait();
+    console.log("added funds to genesis");
   }
 };
 
