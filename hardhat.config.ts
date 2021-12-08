@@ -1,16 +1,21 @@
-import { task } from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
-import "hardhat-gas-reporter";
-import "@nomiclabs/hardhat-web3";
 import "@nomiclabs/hardhat-etherscan";
+import "@nomiclabs/hardhat-ethers";
+import "@nomiclabs/hardhat-waffle";
+import "@nomiclabs/hardhat-web3";
+import "@typechain/hardhat";
+import "hardhat-deploy";
+import "hardhat-ethernal";
+import "hardhat-gas-reporter";
+import "solidity-coverage";
+import dotenv from "dotenv";
+import { task } from "hardhat/config";
 
-// TODO Change this to Typescript
-require('dotenv').config();
+dotenv.config();
 const { API_URL, PRIVATE_KEY, ETHERSCAN_API_KEY, REPORT_GAS } = process.env;
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
-task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
+task("accounts", "Prints the list of accounts", async (_taskArgs, hre: any) => {
   const accounts = await hre.ethers.getSigners();
 
   for (const account of accounts) {
@@ -24,21 +29,46 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
- // TODO Adjust for real deployment
+
+// TODO Adjust for real deployment
 module.exports = {
-  solidity: "0.8.4",
-  defaultNetwork: "goerli",
+  solidity: {
+    compilers: [
+      {
+        version: "0.8.7",
+      },
+      {
+        version: "0.6.6",
+      },
+      {
+        version: "0.4.24",
+      },
+    ],
+  },
+  defaultNetwork: "localhost",
   networks: {
     goerli: {
       url: API_URL,
-      accounts: [PRIVATE_KEY]
-    }
+      accounts: [PRIVATE_KEY],
+    },
   },
   gasReporter: {
-    enabled: REPORT_GAS ? true : false,
+    enabled: !!REPORT_GAS,
     currency: "USD",
   },
   etherscan: {
     apiKey: ETHERSCAN_API_KEY,
+  },
+  namedAccounts: {
+    deployer: {
+      default: 9,
+      1: 9,
+    },
+    player: {
+      default: 0,
+    },
+    oracle: {
+      default: 1,
+    },
   },
 };

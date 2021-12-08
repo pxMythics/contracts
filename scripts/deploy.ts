@@ -15,7 +15,9 @@ async function main() {
 
   // We get the contract to deploy
   const Genesis = await ethers.getContractFactory("Genesis");
-  const genesis = await Genesis.deploy('ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/');
+  const genesis = await Genesis.deploy(
+    "ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/",
+  );
 
   await genesis.deployed();
 

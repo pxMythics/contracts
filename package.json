@@ -1,10 +1,13 @@
 {
   "name": "contracts",
-  "version": "1.0.0",
+  "version": "1.0.s0",
   "description": "",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "ethernal:login": "ethernal login",
+    "ethernal:listen": "ethernal listen",
+    "node:local": "hardhat node --network hardhat",
+    "test": "hardhat test --deploy-fixture --network localhost ./test/test-genesis.ts",
+    "test:full-mint": "hardhat test --deploy-fixture --network localhost ./test/test-mint.ts"
   },
   "repository": {
     "type": "git",
@@ -18,10 +21,13 @@
   },
   "homepage": "https://github.com/pxMythics/contracts#readme",
   "devDependencies": {
+    "@appliedblockchain/chainlink-plugins-fund-link": "^0.0.3",
+    "@chainlink/contracts": "^0.2.2",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.7",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@nomiclabs/hardhat-web3": "^2.0.0",
+    "@openzeppelin/contracts": "^4.4.0",
     "@typechain/ethers-v5": "^7.2.0",
     "@typechain/hardhat": "^2.3.1",
     "@types/chai": "^4.2.22",
@@ -39,8 +45,11 @@
     "eslint-plugin-prettier": "^3.4.1",
     "eslint-plugin-promise": "^5.1.1",
     "ethereum-waffle": "^3.4.0",
-    "ethers": "^5.5.1",
+    "ethernal": "^0.8.1",
+    "ethers": "^5.5.2",
     "hardhat": "^2.6.8",
+    "hardhat-deploy": "^0.9.14",
+    "hardhat-ethernal": "^0.3.10",
     "hardhat-gas-reporter": "^1.0.4",
     "prettier": "^2.5.0",
     "prettier-plugin-solidity": "^1.0.0-beta.13",
@@ -50,8 +59,5 @@
     "typechain": "^5.2.0",
     "typescript": "^4.5.2",
     "web3": "^1.6.1"
-  },
-  "dependencies": {
-    "@openzeppelin/contracts": "^4.3.3"
   }
 }
