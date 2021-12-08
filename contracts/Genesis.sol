@@ -198,6 +198,7 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     /**
      * Enumerable
      */
+    // TODO Might want to add this one at some point. We would probably need a method to know the token types too.
     // function tokensOfOwner(address _owner)
     //     external
     //     view
