@@ -19,8 +19,6 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     // Chainlink
     bytes32 internal keyHash;
     uint256 internal fee;
-    address public VRFCoordinator;
-    address public LinkToken;
     mapping(bytes32 => address) internal requestIdToSender;
     mapping(bytes32 => uint256) internal requestIdToTokenId;
     event RequestedRandomNFT(bytes32 indexed requestId);
@@ -66,8 +64,6 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     {
         _nextTokenId.increment();
         setBaseURI(baseURI);
-        VRFCoordinator = _VRFCoordinator;
-        LinkToken = _LinkToken;
         keyHash = _keyhash;
         fee = 0.1 * 10**18; // 0.1 LINK
     }

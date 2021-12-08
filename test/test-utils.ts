@@ -1,46 +1,37 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { Contract, ContractReceipt } from "ethers";
-import { deployments, ethers, getChainId } from "hardhat";
+import { deployments, ethers } from "hardhat";
 import { Deployment } from "hardhat-deploy/dist/types";
-import { networkConfig } from "../helper-hardhat-config";
+import { Contract, ContractReceipt } from "ethers";
 import { LinkToken } from "../typechain";
 
-/**
- * Deploy the test contract. We use this function to ensure that the contract is brand new after each test
- * @param deployer The signer to deploy the contract
- * @param baseURI The base URI for the contract
- * @returns The Genesis contract, the LinkToken contract and the vrfCoordinator contract.
- */
 export const deployTestContract = async (
-  deployer: SignerWithAddress,
   baseURI: string = "ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/",
 ): Promise<{
   contract: Contract;
   linkToken: Deployment;
   vrfCoordinator: Deployment;
 }> => {
-  // Redeploying the contract at each run to avoid the values being messed up
-  const chainId = await getChainId();
-  const linkToken = await deployments.get("LinkToken");
-  const VRFCoordinatorMock = await deployments.get("VRFCoordinatorMock");
-  const linkTokenAddress = linkToken.address;
-  const vrfCoordinatorAddress = VRFCoordinatorMock.address;
-  const keyHash: string = networkConfig[chainId].keyHash;
-
-  const Genesis = await ethers.getContractFactory("Genesis");
-  const genesis = await Genesis.connect(deployer).deploy(
-    vrfCoordinatorAddress,
-    linkTokenAddress,
-    keyHash,
-    "ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/",
+  let owner: SignerWithAddress;
+  const LinkToken: Deployment = await deployments.get("LinkToken");
+  const VRFCoordinatorMock: Deployment = await deployments.get(
+    "VRFCoordinatorMock",
   );
+
+  await deployments.fixture(["Genesis"]);
+  const GenesisDeployment: Deployment = await deployments.get("Genesis");
+  [owner] = await ethers.getSigners();
+  const Genesis = await ethers.getContractAt(
+    "Genesis",
+    GenesisDeployment.address,
+    owner,
+  );
+
   return {
-    contract: genesis,
-    linkToken: linkToken,
+    contract: Genesis,
+    linkToken: LinkToken,
     vrfCoordinator: VRFCoordinatorMock,
   };
 };
-
 /**
  *  Checks if the contract has enough $LINK and fund it otherwise
  * @param genesis The contract to fund

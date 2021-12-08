@@ -23,7 +23,7 @@ describe("Genesis Contract", () => {
     owner = signers[9];
     address1 = signers[0];
     oracle = signers[1];
-    const deployedContracts = await deployTestContract(owner);
+    const deployedContracts = await deployTestContract();
     contract = deployedContracts.contract;
     VRFCoordinatorMock = deployedContracts.vrfCoordinator;
     // TODO: Perhaps this should be only applied on test where it is needed cause it creates a transaction each time

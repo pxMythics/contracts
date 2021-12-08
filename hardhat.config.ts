@@ -1,4 +1,3 @@
-import "@appliedblockchain/chainlink-plugins-fund-link";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-waffle";
