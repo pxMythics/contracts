@@ -61,8 +61,5 @@ module.exports = {
       default: 9,
       1: 9,
     },
-    oracle: {
-      default: 1,
-    },
   },
 };

@@ -36,17 +36,17 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     uint256 public constant MAX_PER_MINT = 1;
     bool public mintActive = false;
     string public baseTokenURI;
-    Counters.Counter private _nextTokenId;
+    Counters.Counter private nextTokenId;
 
     /**
      * Minting properties
      */
-    mapping(address => uint256) private tokenMintedCount;
+    mapping(address => uint256) private addressToMintCount;
 
     /**
      * WL parameters
      */
-    bytes32 public merkleTreeRoot;
+    bytes32 private merkleTreeRoot;
 
     /**
      * Collection properties
@@ -62,16 +62,8 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     // TODO: This should have the traits if we want everything on chain
     mapping(uint256 => TokenType) public tokenIdToTokenType;
 
-    constructor(
-        address _VRFCoordinator,
-        address _LinkToken,
-        bytes32 _keyhash,
-        string memory baseURI
-    )
-        VRFConsumerBase(_VRFCoordinator, _LinkToken)
-        ERC721("Mythical Sega", "MS")
-    {
-        _nextTokenId.increment();
+    constructor(address vrfCoordinator, address linkToken, bytes32 _keyhash, string memory baseURI) VRFConsumerBase(vrfCoordinator, linkToken) ERC721("Mythical Sega", "MS") {
+        nextTokenId.increment();
         setBaseURI(baseURI);
         keyHash = _keyhash;
         fee = 0.1 * 10**18; // 0.1 LINK
@@ -96,10 +88,17 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     }
 
     /**
-     * Switches the mint active state
+     * Enables mint
      */
-    function flipMintActive() public onlyOwner {
-        mintActive = !mintActive;
+    function enableMint() public onlyOwner {
+        mintActive = true;
+    }
+
+    /**
+     * Disables mint active state
+     */
+    function disableMint() public onlyOwner {
+        mintActive = false;
     }
 
     /**
@@ -110,7 +109,7 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     function fulfillRandomness(bytes32 requestId, uint256 randomNumber) internal override {
         address nftOwner = requestIdToSender[requestId];
         uint256 tokenId = requestIdToTokenId[requestId];
-        require(_nextTokenId.current() > tokenId, "TokenId has not been minted yet!");
+        require(nextTokenId.current() > tokenId, "TokenId has not been minted yet!");
         _mint(nftOwner, tokenId);
         TokenType tokenType = getTokenType(randomNumber);
         tokenIdToTokenType[tokenId] = tokenType;
@@ -136,13 +135,13 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
      * @return requestId request id that was sent to Chainlink VRF
      */
     function mintWhitelist(uint256 nonce, bytes32[] calldata proof) public payable onlyWhitelist(nonce, proof) returns (bytes32 requestId) {
-        require(mintActive, "Minting is not active yet!");
-        uint256 mintIndex = _nextTokenId.current();
+        require(mintActive, "Minting is not active");
+        uint256 mintIndex = nextTokenId.current();
         require(mintIndex <= MAX_SUPPLY, "Sold out");
         require(msg.value >= PRICE, "Not enough ETH");
-        require(tokenMintedCount[msg.sender] == 0, "Already minted");
-        tokenMintedCount[msg.sender]++;
-        _nextTokenId.increment();
+        require(addressToMintCount[msg.sender] == 0, "Already minted");
+        addressToMintCount[msg.sender]++;
+        nextTokenId.increment();
         requestId = requestRandomNumberForTokenId(mintIndex);
         emit RequestedRandomNFT(requestId);
         return requestId;
@@ -190,7 +189,7 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
         require(godsCount + demiGodsCount + elementalsCount > 0, "All NFTs have been generated");
         uint256 totalCountLeft = godsCount + demiGodsCount + elementalsCount;
         // Here we add 1 because we use the counts to define the type. If a count is at 0, we ignore it.
-        // That"s why we don"t ever want the modulo to return 0.
+        // That's why we don't ever want the modulo to return 0.
         uint256 randomTypeIndex = (randomNumber % totalCountLeft) + 1;
         if (randomTypeIndex <= godsCount) {
             godsCount = godsCount.sub(1);
@@ -206,6 +205,7 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
 
     /**
      * Withdraw balance from the contract
+     * TODO Add Reentrancy Guard
      */
     function withdrawAll() public payable onlyOwner {
         uint256 balance = address(this).balance;

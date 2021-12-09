@@ -4,12 +4,7 @@ import { expect } from 'chai';
 import { Contract, utils } from 'ethers';
 import { ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
-import {
-  addLinkFundIfNeeded,
-  addressZero,
-  deployTestContract,
-  mint,
-} from './test-utils';
+import { addLinkFundIfNeeded, deployTestContract, mint } from './test-utils';
 
 describe('Genesis Contract', () => {
   let contract: Contract;
@@ -18,7 +13,6 @@ describe('Genesis Contract', () => {
   let oracle: SignerWithAddress;
   let whitelisted: SignerWithAddress;
   let notWhitelisted: SignerWithAddress;
-  const randomNumber = 777;
   const merkleTreeRoot =
     '0xe32689cba5d4fa1698e45bcc090b47a13a1ea9c41671c5205bebeecd5b9ebb7f';
   const nonce = 0;
@@ -39,7 +33,7 @@ describe('Genesis Contract', () => {
     '0x0ffde5c80d693e686066165e79e1aa33f44b9b3b61ab358e9cda2cfa5988c2af',
   ];
 
-  before(async () => {
+  beforeEach(async () => {
     const signers = await ethers.getSigners();
     owner = signers[9];
     oracle = signers[1];
@@ -74,12 +68,26 @@ describe('Genesis Contract', () => {
         oracle,
         VRFCoordinatorMock.address,
       ),
-    ).to.be.revertedWith('Minting is not active yet!');
+    ).to.be.revertedWith('Minting is not active');
+    await contract.connect(owner).enableMint();
+    expect(await contract.mintActive()).to.be.true;
+    await contract.connect(owner).disableMint();
+    expect(await contract.mintActive()).to.be.false;
+    await expect(
+      mint(
+        owner,
+        bogusNonce,
+        bogusProof,
+        contract,
+        oracle,
+        VRFCoordinatorMock.address,
+      ),
+    ).to.be.revertedWith('Minting is not active');
   });
 
   it('Should allow minting if it is active', async function () {
-    await contract.connect(owner).flipMintActive();
-    expect(await contract.mintActive()).to.be.true;
+    await contract.connect(owner).enableMint();
+    await contract.connect(owner).setMerkleTreeRoot(merkleTreeRoot);
     await expect(
       mint(
         owner,
@@ -93,6 +101,18 @@ describe('Genesis Contract', () => {
   });
 
   it('Cannot mint more than the max mint per account', async function () {
+    await contract.connect(owner).enableMint();
+    await contract.connect(owner).setMerkleTreeRoot(merkleTreeRoot);
+    // first mint
+    mint(
+      owner,
+      bogusNonce,
+      bogusProof,
+      contract,
+      oracle,
+      VRFCoordinatorMock.address,
+    );
+    // second mint should fail
     await expect(
       mint(
         owner,
@@ -106,6 +126,7 @@ describe('Genesis Contract', () => {
   });
 
   it('Cannot mint if the user is not on the whitelist', async function () {
+    await contract.connect(owner).enableMint();
     await contract.connect(owner).setMerkleTreeRoot(merkleTreeRoot);
     await expect(
       mint(
@@ -120,6 +141,8 @@ describe('Genesis Contract', () => {
   });
 
   it('A user on the whitelist cannot mint if the nonce is not valid', async function () {
+    await contract.connect(owner).enableMint();
+    await contract.connect(owner).setMerkleTreeRoot(merkleTreeRoot);
     await expect(
       mint(
         whitelisted,
@@ -133,6 +156,8 @@ describe('Genesis Contract', () => {
   });
 
   it('A user on the whitelist cannot mint if the proof is not valid', async function () {
+    await contract.connect(owner).enableMint();
+    await contract.connect(owner).setMerkleTreeRoot(merkleTreeRoot);
     await expect(
       mint(
         whitelisted,
@@ -146,6 +171,8 @@ describe('Genesis Contract', () => {
   });
 
   it('A user on the whitelist can mint with a valid nonce and proof', async function () {
+    await contract.connect(owner).enableMint();
+    await contract.connect(owner).setMerkleTreeRoot(merkleTreeRoot);
     await expect(
       mint(
         whitelisted,
