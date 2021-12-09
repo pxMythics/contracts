@@ -3,11 +3,15 @@
   "version": "1.0.s0",
   "description": "",
   "scripts": {
+    "accounts": "hardhat accounts",
+    "clean": "hardhat clean",
+    "compile": "hardhat compile",
     "ethernal:login": "ethernal login",
     "ethernal:listen": "ethernal listen",
+    "deploy": "hardhat deploy",
     "node:local": "hardhat node --network hardhat",
-    "test": "hardhat test --deploy-fixture --network localhost ./test/test-genesis.ts",
-    "test:full-mint": "hardhat test --deploy-fixture --network localhost ./test/test-mint.ts"
+    "test": "hardhat test --deploy-fixture --network localhost test/test-genesis.ts",
+    "test:full-mint": "hardhat test --deploy-fixture --network localhost test/test-mint.ts"
   },
   "repository": {
     "type": "git",

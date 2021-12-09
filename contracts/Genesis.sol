@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "hardhat/console.sol";
 
 contract Genesis is ERC721, VRFConsumerBase, Ownable {
@@ -16,28 +17,36 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     using SafeMath for uint256;
     using Counters for Counters.Counter;
 
-    // Chainlink
+    /**
+     * Chainlink VRF
+     */
     bytes32 internal keyHash;
     uint256 internal fee;
     mapping(bytes32 => address) internal requestIdToSender;
     mapping(bytes32 => uint256) internal requestIdToTokenId;
     event RequestedRandomNFT(bytes32 indexed requestId);
+    event Minted(uint256 tokenId, TokenType tokenType);
 
-    Counters.Counter private _nextTokenId;
-
+    /**
+     * Mint parameters
+     */
     // TODO Adjust after testing phase
     uint256 public constant MAX_SUPPLY = 1000;
     uint256 public constant PRICE = 0.0000001 ether;
     uint256 public constant MAX_PER_MINT = 1;
-    bool public presaleActive = false;
     bool public mintActive = false;
-    bool public reservesMinted = false;
     string public baseTokenURI;
+    Counters.Counter private nextTokenId;
 
     /**
      * Minting properties
      */
     mapping(address => uint256) private addressToMintCount;
+
+    /**
+     * WL parameters
+     */
+    bytes32 private merkleTreeRoot;
 
     /**
      * Collection properties
@@ -53,16 +62,8 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     // TODO: This should have the traits if we want everything on chain
     mapping(uint256 => TokenType) public tokenIdToTokenType;
 
-    constructor(
-        address _VRFCoordinator,
-        address _LinkToken,
-        bytes32 _keyhash,
-        string memory baseURI
-    )
-        VRFConsumerBase(_VRFCoordinator, _LinkToken)
-        ERC721("Mythical Sega", "MS")
-    {
-        _nextTokenId.increment();
+    constructor(address vrfCoordinator, address linkToken, bytes32 _keyhash, string memory baseURI) VRFConsumerBase(vrfCoordinator, linkToken) ERC721("Mythical Sega", "MS") {
+        nextTokenId.increment();
         setBaseURI(baseURI);
         keyHash = _keyhash;
         fee = 0.1 * 10**18; // 0.1 LINK
@@ -82,107 +83,114 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
         baseTokenURI = _baseTokenURI;
     }
 
-    function flipPresaleActive() public onlyOwner {
-        presaleActive = !presaleActive;
-    }
-
-    function flipMintActive() public onlyOwner {
-        mintActive = !mintActive;
-    }
-
-    // TODO Figure out how we want to reserve the NFTs for the team
-    function reserveNFTs() public onlyOwner {
-        uint256 mintIndex = _nextTokenId.current();
-        require(mintIndex.add(10) < MAX_SUPPLY, "Not enough NFTs");
-
-        for (uint256 i = 0; i < 10; i++) {
-            _safeMint(msg.sender, mintIndex);
-        }
+    function setMerkleTreeRoot(bytes32 _merkleTreeRoot) public onlyOwner {
+        merkleTreeRoot = _merkleTreeRoot;
     }
 
     /**
-     * VRFConsumerBase
+     * Enables mint
      */
-    function fulfillRandomness(bytes32 requestId, uint256 randomNumber)
-        internal
-        override
-    {
+    function enableMint() public onlyOwner {
+        mintActive = true;
+    }
+
+    /**
+     * Disables mint active state
+     */
+    function disableMint() public onlyOwner {
+        mintActive = false;
+    }
+
+    /**
+     * Callback when a random number gets generated
+     * @param requestId id of the request sent to Chainlink
+     * @param randomNumber random number returned by Chainlink
+     */
+    function fulfillRandomness(bytes32 requestId, uint256 randomNumber) internal override {
         address nftOwner = requestIdToSender[requestId];
         uint256 tokenId = requestIdToTokenId[requestId];
-        require(
-            _nextTokenId.current() > tokenId,
-            "TokenId has not been minted yet!"
-        );
+        require(nextTokenId.current() > tokenId, "TokenId has not been minted yet!");
         _mint(nftOwner, tokenId);
-        tokenIdToTokenType[tokenId] = generateRandomTraits(randomNumber);
+        TokenType tokenType = getTokenType(randomNumber);
+        tokenIdToTokenType[tokenId] = tokenType;
+        emit Minted(tokenId, tokenType);
     }
 
     /**
-     * Minting functions
+     * Mint a given number of tokens
+     * The sender has to be included in the free mint list (except if they are the owner)
+     * @param count number of tokens to mint
+     * @param nonce nonce used to verify that the caller is allowed to mint
+     * @param proof Proof to verify that the caller is allowed to mint
      */
-    // TODO Update function to properly use the requests
-    // TODO: Add logic for the reserved spots
-    function mintNFTs(uint256 _count) public payable {
-        require(mintActive, "Minting is not active yet!");
-        uint256 mintIndex = _nextTokenId.current();
-        require(mintIndex + _count <= MAX_SUPPLY, "NFTs sold out");
-        require(msg.value >= PRICE * _count, "Not enough ETH");
-
-        for (uint256 i = 0; i < _count; i++) {
-            // TODO Validate this
-            mintIndex = _nextTokenId.current();
-            _nextTokenId.increment();
-            requestRandomNumberForTokenId(mintIndex);
-        }
+    function freeMint(uint256 count, uint256 nonce, bytes32[] calldata proof) public payable {
+        // TODO
     }
 
-    // TODO: Add logic for the reserved spots
-    function mint() public payable returns (bytes32) {
-        require(mintActive, "Minting is not active yet!");
-        uint256 mintIndex = _nextTokenId.current();
-        require(mintIndex <= MAX_SUPPLY, "NFTs sold out");
+    /**
+     * Mint 1 token
+     * The sender has to be included in the whitelist (except if they are the owner)
+     * @param nonce nonce used to verify that the caller is allowed to mint
+     * @param proof Proof to verify that the caller is allowed to mint
+     * @return requestId request id that was sent to Chainlink VRF
+     */
+    function mintWhitelist(uint256 nonce, bytes32[] calldata proof) public payable onlyWhitelist(nonce, proof) returns (bytes32 requestId) {
+        require(mintActive, "Minting is not active");
+        uint256 mintIndex = nextTokenId.current();
+        require(mintIndex <= MAX_SUPPLY, "Sold out");
         require(msg.value >= PRICE, "Not enough ETH");
-        require(
-            addressToMintCount[msg.sender] < MAX_PER_MINT,
-            "No more minting spot left"
-        );
-
-        _nextTokenId.increment();
-        bytes32 requestId = requestRandomNumberForTokenId(mintIndex);
-        addressToMintCount[msg.sender] = addressToMintCount[msg.sender].add(1);
+        require(addressToMintCount[msg.sender] == 0, "Already minted");
+        addressToMintCount[msg.sender]++;
+        nextTokenId.increment();
+        requestId = requestRandomNumberForTokenId(mintIndex);
         emit RequestedRandomNFT(requestId);
         return requestId;
     }
 
-    function requestRandomNumberForTokenId(uint256 _tokenId)
-        internal
-        returns (bytes32 requestId)
-    {
-        require(
-            LINK.balanceOf(address(this)) >= fee,
-            "Not enough LINK - fill contract with faucet"
-        );
+    /**
+     * Requests a random number to Chainlink VRF for a given token id
+     * @param tokenId id of the token
+     * @return requestId id of the request sent to Chainlink
+     */
+    function requestRandomNumberForTokenId(uint256 tokenId) internal returns (bytes32 requestId) {
+        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
         requestId = requestRandomness(keyHash, fee);
         requestIdToSender[requestId] = msg.sender;
-        requestIdToTokenId[requestId] = _tokenId;
+        requestIdToTokenId[requestId] = tokenId;
         return requestId;
     }
 
     /**
-     * Randomization
+     * Generate a leaf of the Merkle tree with a nonce and the address of the sender
+     * @param nonce nonce to be used
+     * @param addr id of the token
+     * @return leaf generated
      */
-    function generateRandomTraits(uint256 _randomNumber)
-        private
-        returns (TokenType genesisType)
-    {
-        require(
-            godsCount + demiGodsCount + elementalsCount > 0,
-            "All NFTs have been generated"
-        );
+    function generateLeaf(uint256 nonce, address addr) internal pure returns (bytes32 leaf) {
+        return keccak256(abi.encodePacked(nonce, addr));
+    }
+
+    /**
+     * Verifies the proof of the sender to confirm they are in the whitelist
+     * @param nonce nonce to be used
+     * @param proof proof
+     * @return valid TRUE if the proof is valid, FALSE otherwise
+     */
+    function verifyProof(uint256 nonce, bytes32[] memory proof) internal view returns (bool valid) {
+        return MerkleProof.verify(proof, merkleTreeRoot, generateLeaf(nonce, msg.sender));
+    }
+
+    /**
+     * Returns the token type (god, demi-god, or elemental) given a random number
+     * @param randomNumber random number provided
+     * @return tokenType a randomly picked token type
+     */
+    function getTokenType(uint256 randomNumber) private returns (TokenType tokenType) {
+        require(godsCount + demiGodsCount + elementalsCount > 0, "All NFTs have been generated");
         uint256 totalCountLeft = godsCount + demiGodsCount + elementalsCount;
         // Here we add 1 because we use the counts to define the type. If a count is at 0, we ignore it.
         // That's why we don't ever want the modulo to return 0.
-        uint256 randomTypeIndex = (_randomNumber % totalCountLeft) + 1;
+        uint256 randomTypeIndex = (randomNumber % totalCountLeft) + 1;
         if (randomTypeIndex <= godsCount) {
             godsCount = godsCount.sub(1);
             return TokenType.GOD;
@@ -196,31 +204,26 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     }
 
     /**
-     * Enumerable
+     * Withdraw balance from the contract
+     * TODO Add Reentrancy Guard
      */
-    // TODO Might want to add this one at some point. We would probably need a method to know the token types too.
-    // function tokensOfOwner(address _owner)
-    //     external
-    //     view
-    //     returns (uint256[] memory)
-    // {
-    //     uint256 tokenCount = balanceOf(_owner);
-    //     uint256[] memory tokensId = new uint256[](tokenCount);
-    //     for (uint256 i = 0; i < tokenCount; i++) {
-    //         tokensId[i] = tokenOfOwnerByIndex(_owner, i);
-    //     }
-
-    //     return tokensId;
-    // }
-
-    /**
-     * Withdrawing
-     */
-    // TODO Add the logic to distribute funds amongst the team
-    function withdraw() public payable onlyOwner {
+    function withdrawAll() public payable onlyOwner {
         uint256 balance = address(this).balance;
         require(balance > 0, "No ether left to withdraw");
         (bool success, ) = (msg.sender).call{value: balance}("");
         require(success, "Transfer failed.");
+    }
+
+    /**
+     * Modifier that limits the function to WL members only
+     * @param nonce nonce to be used
+     * @param proof proof
+     * Owner bypasses this (for tests)
+     */
+    modifier onlyWhitelist(uint256 nonce, bytes32[] memory proof) {
+        if (msg.sender != owner()) {
+            require(verifyProof(nonce, proof), "Address is not in the whitelist");
+        }
+        _;
     }
 }
