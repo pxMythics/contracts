@@ -64,11 +64,5 @@ module.exports = {
     oracle: {
       default: 1,
     },
-    whitelisted1: {
-      default: 2,
-    },
-    whitelisted2: {
-      default: 3,
-    },
   },
 };

@@ -16,12 +16,35 @@ describe('Genesis Contract', () => {
   let VRFCoordinatorMock: Deployment;
   let owner: SignerWithAddress;
   let oracle: SignerWithAddress;
+  let whitelisted: SignerWithAddress;
+  let notWhitelisted: SignerWithAddress;
   const randomNumber = 777;
+  const merkleTreeRoot =
+    '0xe32689cba5d4fa1698e45bcc090b47a13a1ea9c41671c5205bebeecd5b9ebb7f';
+  const nonce = 0;
+  const proof = [
+    '0x6979242712a952fdd0e6020e3b0c5ab00e441efc3a8e5f3550b44bdfef0bc8fe',
+    '0xc2fcc0de40e2633995715cba771542dd0e55202ea7203cba6597154fa5166b9a',
+    '0x7f5e7f7411eff0a9aa5209931feb717d400cdea255ab6b415205b35e0b4e5dd1',
+    '0xd0c7c1535456333e883f588cd7b1fd89c69d9cccb3e44384df48131d279c7242',
+    '0x917003bd175f847c8cace233737e6bea0ec6857553135fad5679bafa987377c6',
+    '0xf55e6ce46027df69d182f452137be4258598c22fd4c86ea842590ae9eb1aad7b',
+    '0x2ca4e96251485c7f5b3078c31b7befb7df302db3f70475be3850d200da04915f',
+    '0xf7a619404c2ecfbc206616a2be4a8c6d737a47e50c4f321c4bc4db2823d49a82',
+    '0x88dfe75f40c9b2f91343fa790ca8779dd027c5ed230ce71b83b56fbae4503c3b',
+    '0x4295d089ba50f6833e1eebf5dc495f3ab00c0ca99de72602439df04fd0fd00c4',
+  ];
+  const bogusNonce = 99999;
+  const bogusProof = [
+    '0x0ffde5c80d693e686066165e79e1aa33f44b9b3b61ab358e9cda2cfa5988c2af',
+  ];
 
   before(async () => {
     const signers = await ethers.getSigners();
     owner = signers[9];
     oracle = signers[1];
+    whitelisted = signers[2];
+    notWhitelisted = signers[4];
     const deployedContracts = await deployTestContract();
     contract = deployedContracts.contract;
     VRFCoordinatorMock = deployedContracts.vrfCoordinator;
@@ -43,61 +66,95 @@ describe('Genesis Contract', () => {
 
   it('Should not allow minting if it is not active', async function () {
     await expect(
-      contract
-        .connect(owner)
-        .mintWhitelist(
-          0,
-          [
-            '0x0ffde5c80d693e686066165e79e1aa33f44b9b3b61ab358e9cda2cfa5988c2af',
-          ],
-          { value: ethers.utils.parseEther('0.0000001') },
-        ),
+      mint(
+        owner,
+        bogusNonce,
+        bogusProof,
+        contract,
+        oracle,
+        VRFCoordinatorMock.address,
+      ),
     ).to.be.revertedWith('Minting is not active yet!');
   });
 
   it('Should allow minting if it is active', async function () {
     await contract.connect(owner).flipMintActive();
     expect(await contract.mintActive()).to.be.true;
-
-    const mintTx = await contract
-      .connect(owner)
-      .mintWhitelist(
-        0,
-        ['0x0ffde5c80d693e686066165e79e1aa33f44b9b3b61ab358e9cda2cfa5988c2af'],
-        { value: ethers.utils.parseEther('0.0000001') },
-      );
-    const mintReceipt = await mintTx.wait();
-    const requestId = mintReceipt.events?.find(
-      (x: any) => x.event === 'RequestedRandomNFT',
-    ).args[0];
-
-    const vrfCoordinatorMock = await ethers.getContractAt(
-      'VRFCoordinatorMock',
-      VRFCoordinatorMock.address,
-      oracle,
-    );
-
     await expect(
-      vrfCoordinatorMock.callBackWithRandomness(
-        requestId,
-        randomNumber,
-        contract.address,
+      mint(
+        owner,
+        bogusNonce,
+        bogusProof,
+        contract,
+        oracle,
+        VRFCoordinatorMock.address,
       ),
-    )
-      .to.emit(contract, 'Transfer')
-      .withArgs(addressZero(), owner.address, 1);
+    ).to.emit(contract, 'Minted');
   });
 
   it('Cannot mint more than the max mint per account', async function () {
     await expect(
       mint(
         owner,
-        0,
-        ['0x0ffde5c80d693e686066165e79e1aa33f44b9b3b61ab358e9cda2cfa5988c2af'],
+        bogusNonce,
+        bogusProof,
         contract,
         oracle,
         VRFCoordinatorMock.address,
       ),
     ).to.be.revertedWith('Already minted');
+  });
+
+  it('Cannot mint if the user is not on the whitelist', async function () {
+    await contract.connect(owner).setMerkleTreeRoot(merkleTreeRoot);
+    await expect(
+      mint(
+        notWhitelisted,
+        bogusNonce,
+        bogusProof,
+        contract,
+        oracle,
+        VRFCoordinatorMock.address,
+      ),
+    ).to.be.revertedWith('Address is not in the whitelist');
+  });
+
+  it('A user on the whitelist cannot mint if the nonce is not valid', async function () {
+    await expect(
+      mint(
+        whitelisted,
+        bogusNonce,
+        proof,
+        contract,
+        oracle,
+        VRFCoordinatorMock.address,
+      ),
+    ).to.be.revertedWith('Address is not in the whitelist');
+  });
+
+  it('A user on the whitelist cannot mint if the proof is not valid', async function () {
+    await expect(
+      mint(
+        whitelisted,
+        nonce,
+        bogusProof,
+        contract,
+        oracle,
+        VRFCoordinatorMock.address,
+      ),
+    ).to.be.revertedWith('Address is not in the whitelist');
+  });
+
+  it('A user on the whitelist can mint with a valid nonce and proof', async function () {
+    await expect(
+      mint(
+        whitelisted,
+        nonce,
+        proof,
+        contract,
+        oracle,
+        VRFCoordinatorMock.address,
+      ),
+    ).to.emit(contract, 'Minted');
   });
 });

@@ -89,7 +89,7 @@ export const mint = async (
     oracle,
   );
 
-  await vrfCoordinatorMock.callBackWithRandomness(
+  return vrfCoordinatorMock.callBackWithRandomness(
     requestId,
     Math.floor(Math.random() * 100000),
     contract.address,

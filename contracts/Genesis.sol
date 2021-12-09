@@ -25,7 +25,7 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
     mapping(bytes32 => address) internal requestIdToSender;
     mapping(bytes32 => uint256) internal requestIdToTokenId;
     event RequestedRandomNFT(bytes32 indexed requestId);
-    event NFTminted(uint256 tokenId, TokenType tokenType);
+    event Minted(uint256 tokenId, TokenType tokenType);
 
     /**
      * Mint parameters
@@ -114,7 +114,7 @@ contract Genesis is ERC721, VRFConsumerBase, Ownable {
         _mint(nftOwner, tokenId);
         TokenType tokenType = getTokenType(randomNumber);
         tokenIdToTokenType[tokenId] = tokenType;
-        emit NFTminted(tokenId, tokenType);
+        emit Minted(tokenId, tokenType);
     }
 
     /**
