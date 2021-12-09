@@ -1,27 +1,26 @@
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { expect } from "chai";
-import { Contract, utils } from "ethers";
-import { ethers } from "hardhat";
-import { Deployment } from "hardhat-deploy/dist/types";
+/* eslint-disable no-unused-expressions */
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { expect } from 'chai';
+import { Contract, utils } from 'ethers';
+import { ethers } from 'hardhat';
+import { Deployment } from 'hardhat-deploy/dist/types';
 import {
   addLinkFundIfNeeded,
   addressZero,
   deployTestContract,
   mint,
-} from "./test-utils";
+} from './test-utils';
 
-describe("Genesis Contract", () => {
+describe('Genesis Contract', () => {
   let contract: Contract;
   let VRFCoordinatorMock: Deployment;
   let owner: SignerWithAddress;
-  let address1: SignerWithAddress;
   let oracle: SignerWithAddress;
   const randomNumber = 777;
 
-  beforeEach(async () => {
+  before(async () => {
     const signers = await ethers.getSigners();
     owner = signers[9];
-    address1 = signers[0];
     oracle = signers[1];
     const deployedContracts = await deployTestContract();
     contract = deployedContracts.contract;
@@ -31,42 +30,49 @@ describe("Genesis Contract", () => {
   });
 
   // TODO Adjust with real values
-  it("Should initialize the Genesis contract", async () => {
+  it('Should initialize the Genesis contract', async () => {
     expect(await contract.MAX_SUPPLY()).to.equal(1000);
-    expect(await contract.PRICE()).to.equal(utils.parseEther("0.0000001"));
+    expect(await contract.PRICE()).to.equal(utils.parseEther('0.0000001'));
     expect(await contract.MAX_PER_MINT()).to.equal(1);
-    expect(await contract.presaleActive()).to.be.false;
     expect(await contract.mintActive()).to.be.false;
-    expect(await contract.reservesMinted()).to.be.false;
   });
 
-  it("Should set the right owner", async () => {
+  it('Should set the right owner', async () => {
     expect(await contract.owner()).to.equal(await owner.address);
   });
 
-  it("Should not allow minting if it is not active", async function () {
-    await expect(contract.connect(address1).mint()).to.be.revertedWith(
-      "Minting is not active yet!",
-    );
-    await expect(contract.connect(owner).mintNFTs(5)).to.be.revertedWith(
-      "Minting is not active yet!",
-    );
+  it('Should not allow minting if it is not active', async function () {
+    await expect(
+      contract
+        .connect(owner)
+        .mintWhitelist(
+          0,
+          [
+            '0x0ffde5c80d693e686066165e79e1aa33f44b9b3b61ab358e9cda2cfa5988c2af',
+          ],
+          { value: ethers.utils.parseEther('0.0000001') },
+        ),
+    ).to.be.revertedWith('Minting is not active yet!');
   });
 
-  it("Should allow minting if it is active", async function () {
+  it('Should allow minting if it is active', async function () {
     await contract.connect(owner).flipMintActive();
     expect(await contract.mintActive()).to.be.true;
 
-    const mintTx = await contract.connect(address1).mint({
-      value: ethers.utils.parseEther("0.0000001"),
-    });
+    const mintTx = await contract
+      .connect(owner)
+      .mintWhitelist(
+        0,
+        ['0x0ffde5c80d693e686066165e79e1aa33f44b9b3b61ab358e9cda2cfa5988c2af'],
+        { value: ethers.utils.parseEther('0.0000001') },
+      );
     const mintReceipt = await mintTx.wait();
     const requestId = mintReceipt.events?.find(
-      (x: any) => x.event === "RequestedRandomNFT",
+      (x: any) => x.event === 'RequestedRandomNFT',
     ).args[0];
 
     const vrfCoordinatorMock = await ethers.getContractAt(
-      "VRFCoordinatorMock",
+      'VRFCoordinatorMock',
       VRFCoordinatorMock.address,
       oracle,
     );
@@ -78,19 +84,20 @@ describe("Genesis Contract", () => {
         contract.address,
       ),
     )
-      .to.emit(contract, "Transfer")
-      .withArgs(addressZero(), address1.address, 1);
+      .to.emit(contract, 'Transfer')
+      .withArgs(addressZero(), owner.address, 1);
   });
 
-  it("Cannot mint more than the max mint per account", async function () {
-    await contract.connect(owner).flipMintActive();
-    expect(await contract.mintActive()).to.be.true;
-
-    await mint(address1, contract, oracle, VRFCoordinatorMock.address);
+  it('Cannot mint more than the max mint per account', async function () {
     await expect(
-      contract.connect(address1).mint({
-        value: ethers.utils.parseEther("0.0000001"),
-      }),
-    ).to.be.revertedWith("No more minting spot left");
+      mint(
+        owner,
+        0,
+        ['0x0ffde5c80d693e686066165e79e1aa33f44b9b3b61ab358e9cda2cfa5988c2af'],
+        contract,
+        oracle,
+        VRFCoordinatorMock.address,
+      ),
+    ).to.be.revertedWith('Already minted');
   });
 });
