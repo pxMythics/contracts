@@ -37,7 +37,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     // TODO Adjust after testing phase
     uint256 public constant MAX_SUPPLY = 1000;
     uint256 public constant PRICE = 0.0000001 ether;
-    uint256 public constant MAX_MINT_PER_WHITELIST = 1;
+    uint256 public constant WHITELIST_MINT_COUNT = 1;
     uint256 public constant GODS_MAX_SUPPLY = 50;
     uint256 public constant DEMI_GODS_MAX_SUPPLY = 400;
     uint256 public constant ELEMENTALS_MAX_SUPPLY = 550;
@@ -54,7 +54,8 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      */
     mapping(address => uint256) private addressToMintCount;
     mapping(address => uint256) private addressToRequestCount;
-    bytes32 private merkleTreeRoot;
+    bytes32 private whiteListMerkleTreeRoot;
+    bytes32 private freeMintMerkleTreeRoot;
     mapping(uint256 => TokenTraits) public tokenIdToTraits;
 
     constructor(address vrfCoordinator, address linkToken, bytes32 _keyhash, string memory baseURI) VRFConsumerBase(vrfCoordinator, linkToken) ERC721("Mythical Sega", "MS") {
@@ -78,8 +79,11 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     function setBaseURI(string memory _baseTokenURI) public onlyOwner {
         baseTokenURI = _baseTokenURI;
     }
-    function setMerkleTreeRoot(bytes32 _merkleTreeRoot) public onlyOwner {
-        merkleTreeRoot = _merkleTreeRoot;
+    function setWhiteListMerkleTreeRoot(bytes32 _whiteListMerkleTreeRoot) public onlyOwner {
+        whiteListMerkleTreeRoot = _whiteListMerkleTreeRoot;
+    }
+    function setFreeMintMerkleTreeRoot(bytes32 _freeMintMerkleTreeRoot) public onlyOwner {
+        freeMintMerkleTreeRoot = _freeMintMerkleTreeRoot;
     }
 
     /**
@@ -165,49 +169,52 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
 
     /**
      * Requests minting
-     * @return requestId request id that was sent to Chainlink VRF
+     * @param sender sender of the request 
      */
-    function requestMint() private returns (bytes32 requestId) {
-        addressToRequestCount[msg.sender]++;
-        requestId = requestRandomNumberForTokenId(tokenCounter.current() + randomNumberRequestsCounter.current());
+    function requestMint(address sender) private {
+        addressToRequestCount[sender]++;
+        bytes32 requestId = requestRandomNumberForTokenId(sender, tokenCounter.current() + randomNumberRequestsCounter.current());
         randomNumberRequestsCounter.increment();
         emit RequestedRandomNFT(requestId);
-        return requestId;
     }
 
     /**
-     * Mint a given number of tokens
-     * The sender has to be included in the free mint list (except if they are the owner)
+     * Free mint
      * @param count number of tokens to mint
-     * @param nonce nonce used to verify that the caller is allowed to mint
+     * @param maxMintCount maximum number of tokens the user can mint. Also used as a nonce to validate the proof.
      * @param proof Proof to verify that the caller is allowed to mint
      */
-    function freeMint(uint256 count, uint256 nonce, bytes32[] calldata proof) public payable {
-        // TODO
+    function freeMint(uint count, uint256 maxMintCount, bytes32[] calldata proof) public whenNotPaused() onlyFreeMint(maxMintCount, proof) {
+        require((tokenCounter.current() + count) <= MAX_SUPPLY, "Not enough supply");
+        uint mintCount = addressToMintCount[msg.sender] + addressToRequestCount[msg.sender] + count;
+        require(mintCount <= maxMintCount, "Trying to mint more than allowed");
+        for (uint256 i=0; i < count; i++) {
+            requestMint(msg.sender);
+        }
     }
 
     /**
-     * Mint 1 token
-     * The sender has to be included in the whitelist (except if they are the owner)
+     * Whitelist mint
      * @param nonce nonce used to verify that the caller is allowed to mint
      * @param proof Proof to verify that the caller is allowed to mint
-     * @return requestId request id that was sent to Chainlink VRF
      */
-    function mintWhitelist(uint256 nonce, bytes32[] calldata proof) public payable whenNotPaused() mintable(1) 
-    onlyWhitelist(nonce, proof) returns (bytes32 requestId) {
-        require((addressToMintCount[msg.sender] + addressToRequestCount[msg.sender]) < MAX_MINT_PER_WHITELIST, "Already minted");
-        return requestMint();
+    function mintWhitelist(uint256 nonce, bytes32[] calldata proof) public payable whenNotPaused() onlyWhitelist(nonce, proof) {
+        require((tokenCounter.current() + WHITELIST_MINT_COUNT) <= MAX_SUPPLY, "Not enough supply");
+        require(msg.value >= PRICE, "Not enough ETH");
+        require((addressToMintCount[msg.sender] + addressToRequestCount[msg.sender]) < WHITELIST_MINT_COUNT, "Already minted");
+        requestMint(msg.sender);
     }
 
     /**
      * Requests a random number to Chainlink VRF for a given token id
+     * @param sender sender of the request 
      * @param tokenId id of the token
      * @return requestId id of the request sent to Chainlink
      */
-    function requestRandomNumberForTokenId(uint256 tokenId) internal returns (bytes32 requestId) {
+    function requestRandomNumberForTokenId(address sender, uint256 tokenId) internal returns (bytes32 requestId) {
         require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
         requestId = requestRandomness(keyHash, fee);
-        requestIdToSender[requestId] = msg.sender;
+        requestIdToSender[requestId] = sender;
         requestIdToTokenId[requestId] = tokenId;
         return requestId;
     }
@@ -223,13 +230,14 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     }
 
     /**
-     * Verifies the proof of the sender to confirm they are in the whitelist
+     * Verifies the proof of the sender to confirm they are in given list
      * @param nonce nonce to be used
+     * @param root Merkle tree root
      * @param proof proof
      * @return valid TRUE if the proof is valid, FALSE otherwise
      */
-    function verifyProof(uint256 nonce, bytes32[] memory proof) internal view returns (bool valid) {
-        return MerkleProof.verify(proof, merkleTreeRoot, generateLeaf(nonce, msg.sender));
+    function verifyProof(uint256 nonce, bytes32 root, bytes32[] memory proof) internal view returns (bool valid) {
+        return MerkleProof.verify(proof, root, generateLeaf(nonce, msg.sender));
     }
 
     /**
@@ -274,22 +282,22 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     }
 
     /**
-     * Modifier that limits the function to WL members only
+     * Modifier that limits the function to whitelist members only
      * @param nonce nonce to be used
      * @param proof proof
      */
     modifier onlyWhitelist(uint256 nonce, bytes32[] memory proof) {
-        require(verifyProof(nonce, proof), "Address is not in the whitelist");
+        require(verifyProof(nonce, whiteListMerkleTreeRoot, proof), "Address is not in the whitelist");
         _;
     }
 
     /**
-     * Modifier that checks if mint is possible
-     * @param count number of tokens to mint
+     * Modifier that limits the function to free mint list members only
+     * @param nonce nonce to be used
+     * @param proof proof
      */
-    modifier mintable(uint256 count) {
-        require((tokenCounter.current() + count) <= MAX_SUPPLY, "Not enough supply");
-        require(msg.value >= PRICE, "Not enough ETH");
+    modifier onlyFreeMint(uint256 nonce, bytes32[] memory proof) {
+        require(verifyProof(nonce, freeMintMerkleTreeRoot, proof), "Address is not in the free mint list");
         _;
     }
 }

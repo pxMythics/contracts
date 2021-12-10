@@ -95,3 +95,39 @@ export const mint = async (
     contract.address,
   );
 };
+
+/**
+ * Free mint
+ * @param count mint count
+ * @param minter The signer that mints
+ * @param contract The Genesis contract
+ * @param oracle The oracle
+ * @param coordinatorMockAddress The coordinator mock address
+ */
+export const freeMint = async (
+  count: number,
+  minter: SignerWithAddress,
+  nonce: number,
+  proof: string[],
+  contract: Contract,
+  oracle: SignerWithAddress,
+  coordinatorMockAddress: string,
+) => {
+  const mintTx = await contract.connect(minter).freeMint(count, nonce, proof);
+  const mintReceipt: ContractReceipt = await mintTx.wait();
+  const requestId = mintReceipt.events?.find(
+    (x: any) => x.event === 'RequestedRandomNFT',
+  )?.args![0];
+
+  const vrfCoordinatorMock = await ethers.getContractAt(
+    'VRFCoordinatorMock',
+    coordinatorMockAddress,
+    oracle,
+  );
+
+  return vrfCoordinatorMock.callBackWithRandomness(
+    requestId,
+    Math.floor(Math.random() * 100000),
+    contract.address,
+  );
+};
