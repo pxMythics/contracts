@@ -362,4 +362,26 @@ describe('Genesis Contract', () => {
       ),
     ).to.be.revertedWith('Trying to mint more than allowed');
   });
+
+  it('Make sure the contract has 10 reserved gods and that they can be transfered', async function () {
+    const whitelistedAddr = whitelisted.address;
+    await contract.connect(owner).unpause();
+    expect(await contract.connect(owner).reservedGodsSupply()).to.equal(10);
+    await expect(
+      contract.connect(whitelisted).reservedGodsSupply(),
+    ).to.be.revertedWith('Ownable: caller is not the owner');
+
+    // mint 1 reserved god
+    await contract.connect(owner).mintReservedGods(whitelistedAddr, 1);
+    expect(await contract.balanceOf(whitelistedAddr)).to.equal(1);
+    // TODO check metadata if God
+    // mint 4 reserved gods
+    await contract.connect(owner).mintReservedGods(whitelistedAddr, 4);
+    expect(await contract.balanceOf(whitelistedAddr)).to.equal(5);
+    expect(await contract.connect(owner).reservedGodsSupply()).to.equal(5);
+    // try to mint more reserved gods that are left
+    await expect(
+      contract.connect(owner).mintReservedGods(whitelistedAddr, 10),
+    ).to.be.revertedWith('Not enough reserved gods left');
+  });
 });
