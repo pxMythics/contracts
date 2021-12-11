@@ -41,6 +41,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     uint256 public constant GODS_MAX_SUPPLY = 50;
     uint256 public constant DEMI_GODS_MAX_SUPPLY = 400;
     uint256 public constant ELEMENTALS_MAX_SUPPLY = 550;
+    uint256 public constant RESERVED_GODS_MAX_SUPPLY = 10;
     bool public mintActive = false;
     string public baseTokenURI;
     Counters.Counter private tokenCounter;
@@ -48,6 +49,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     Counters.Counter private godsCounter;
     Counters.Counter private demiGodsCounter;
     Counters.Counter private elementalsCounter;
+    Counters.Counter private reservedGodsTransfered;
 
     /**
      * Minting properties
@@ -63,6 +65,12 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         setBaseURI(baseURI);
         keyHash = _keyhash;
         fee = 0.1 * 10**18; // 0.1 LINK
+        
+        // reserve 10 gods for owner
+        for (uint256 i=0; i < RESERVED_GODS_MAX_SUPPLY; i++) {
+            godsCounter.increment();
+            tokenCounter.increment();
+        }
         _pause();
     }
 
@@ -279,6 +287,27 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         require(balance > 0, "No ether left to withdraw");
         (bool success, ) = (msg.sender).call{value: balance}("");
         require(success, "Transfer failed.");
+    }
+
+    /**
+    * Returns the number of reserved gods left
+    * @return count the amount of reserved gods left
+    */
+    function reservedGodsSupply() public view onlyOwner returns (uint256 count) {
+        return RESERVED_GODS_MAX_SUPPLY - reservedGodsTransfered.current();
+    }
+
+    /**
+    * Mint reserved gods
+    * @param to address to send the god to
+    * @param count number of gods to transfer
+    */
+    function mintReservedGods(address to, uint256 count) public onlyOwner {
+        require(reservedGodsSupply() >= count, "Not enough reserved gods left");
+        for (uint256 i=0; i < count; i++) {
+            reservedGodsTransfered.increment();
+            mintGod(to, reservedGodsTransfered.current());
+        }
     }
 
     /**
