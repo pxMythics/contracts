@@ -91,20 +91,6 @@ describe('Genesis Contract', () => {
         VRFCoordinatorMock.address,
       ),
     ).to.be.revertedWith('Pausable: paused');
-    await contract.connect(owner).unpause();
-    expect(await contract.paused()).to.be.false;
-    await contract.connect(owner).pause();
-    expect(await contract.paused()).to.be.true;
-    await expect(
-      mint(
-        whitelisted,
-        whiteListNonce,
-        whiteListProof,
-        contract,
-        oracle,
-        VRFCoordinatorMock.address,
-      ),
-    ).to.be.revertedWith('Pausable: paused');
   });
 
   it('Should allow minting if it is active', async function () {
@@ -209,6 +195,20 @@ describe('Genesis Contract', () => {
         whitelisted,
         whiteListNonce,
         bogusProof,
+        contract,
+        oracle,
+        VRFCoordinatorMock.address,
+      ),
+    ).to.be.revertedWith('Address is not in the whitelist');
+  });
+
+  it('Minting should fail for a user on the whitelist with a valid nonce and proof if merkle tree root has not been set', async function () {
+    await contract.connect(owner).unpause();
+    await expect(
+      mint(
+        whitelisted,
+        whiteListNonce,
+        whiteListProof,
         contract,
         oracle,
         VRFCoordinatorMock.address,

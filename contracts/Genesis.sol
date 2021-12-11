@@ -61,7 +61,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     mapping(uint256 => TokenTraits) public tokenIdToTraits;
 
     constructor(address vrfCoordinator, address linkToken, bytes32 _keyhash, string memory baseURI) VRFConsumerBase(vrfCoordinator, linkToken) ERC721("Mythical Sega", "MS") {
-        tokenCounter.increment();   // we want to start the counter at 1
+        // TODO start other counters at 1 to save on gas
         setBaseURI(baseURI);
         keyHash = _keyhash;
         fee = 0.1 * 10**18; // 0.1 LINK
@@ -110,55 +110,60 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
 
     /**
      * Mint a god
-     * @param nftOwner address of the NFT owner
+     * @param to address of the NFT owner
      * @param tokenId id of the token to be minted
      */
-    function mintGod(address nftOwner, uint256 tokenId) private {
+    function mintGod(address to, uint256 tokenId) private {
+        require(godsCounter.current() < GODS_MAX_SUPPLY, "Not enough gods left");
         godsCounter.increment();
         tokenIdToTraits[tokenId] = TokenTraits(TokenType.GOD);
-        _mint(nftOwner, tokenId);
+        _mint(to, tokenId);
     }
 
     /**
      * Mint a demi-god
-     * @param nftOwner address of the NFT owner
+     * @param to address of the NFT owner
      * @param tokenId id of the token to be minted
+     * @param randomNumber random number used to generate traits
      */
-    function mintDemiGod(address nftOwner, uint256 tokenId) private {
+    function mintDemiGod(address to, uint256 tokenId, uint256 randomNumber) private {
+        require(demiGodsCounter.current() < DEMI_GODS_MAX_SUPPLY, "Not enough demi-gods left");
         demiGodsCounter.increment();
+        // TODO add other traits
         tokenIdToTraits[tokenId] = TokenTraits(TokenType.DEMI_GOD);
-        _mint(nftOwner, tokenId);
+        _mint(to, tokenId);
     }
 
     /**
      * Mint an elemental
-     * @param nftOwner address of the NFT owner
+     * @param to address of the NFT owner
      * @param tokenId id of the token to be minted
      * @param randomNumber random number used to generate traits
      */
-    function mintElemental(address nftOwner, uint256 tokenId, uint256 randomNumber) private {
+    function mintElemental(address to, uint256 tokenId, uint256 randomNumber) private {
+        require(elementalsCounter.current() < ELEMENTALS_MAX_SUPPLY, "Not enough elementals left");
         elementalsCounter.increment();
         // TODO add other traits
         tokenIdToTraits[tokenId] = TokenTraits(TokenType.ELEMENTAL);
-        _mint(nftOwner, tokenId);
+        _mint(to, tokenId);
     }
 
     /**
      * Mint a token
-     * @param nftOwner address of the NFT owner
+     * @param to address of the NFT owner
      * @param tokenId id of the token to be minted
      * @param randomNumber random number returned by Chainlink
      */
-    function mint(address nftOwner, uint256 tokenId, uint256 randomNumber) private {
+    function mint(address to, uint256 tokenId, uint256 randomNumber) private {
         tokenCounter.increment();
-        addressToMintCount[nftOwner]++;
+        addressToMintCount[to]++; // we use ++ directyly because it's never gonna overflow, because amount of mints are limited
         TokenType tokenType = getTokenType(randomNumber);     
         if (tokenType == TokenType.GOD) {
-            mintGod(nftOwner, tokenId);
+            mintGod(to, tokenId);
         } else if (tokenType == TokenType.DEMI_GOD) {
-            mintDemiGod(nftOwner, tokenId);
+            mintDemiGod(to, tokenId, randomNumber);
         } else {
-            mintElemental(nftOwner, tokenId, randomNumber);
+            mintElemental(to, tokenId, randomNumber);
         }
         emit Minted(tokenId, tokenType);
     }
@@ -170,18 +175,17 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      */
     function fulfillRandomness(bytes32 requestId, uint256 randomNumber) internal override {
         randomNumberRequestsCounter.decrement();
-        address nftOwner = requestIdToSender[requestId];
-        addressToRequestCount[nftOwner]--;
-        mint(nftOwner, requestIdToTokenId[requestId], randomNumber);
+        address to = requestIdToSender[requestId];
+        addressToRequestCount[to]--; // we use -- directyly because it's never gonna be less than 0
+        mint(to, requestIdToTokenId[requestId], randomNumber);
     }
 
     /**
      * Requests minting
-     * @param sender sender of the request 
      */
-    function requestMint(address sender) private {
-        addressToRequestCount[sender]++;
-        bytes32 requestId = requestRandomNumberForTokenId(sender, tokenCounter.current() + randomNumberRequestsCounter.current());
+    function requestMint() private {
+        addressToRequestCount[msg.sender]++; // we use ++ directyly because it's never gonna overflow, because amount of mints are limited
+        bytes32 requestId = requestRandomNumberForTokenId(msg.sender, tokenCounter.current() + randomNumberRequestsCounter.current() + 1);
         randomNumberRequestsCounter.increment();
         emit RequestedRandomNFT(requestId);
     }
@@ -193,11 +197,11 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      * @param proof Proof to verify that the caller is allowed to mint
      */
     function freeMint(uint count, uint256 maxMintCount, bytes32[] calldata proof) public whenNotPaused() onlyFreeMint(maxMintCount, proof) {
-        require((tokenCounter.current() + count) <= MAX_SUPPLY, "Not enough supply");
+        require((tokenCounter.current() + count) < MAX_SUPPLY, "Not enough supply");
         uint mintCount = addressToMintCount[msg.sender] + addressToRequestCount[msg.sender] + count;
         require(mintCount <= maxMintCount, "Trying to mint more than allowed");
         for (uint256 i=0; i < count; i++) {
-            requestMint(msg.sender);
+            requestMint();
         }
     }
 
@@ -207,10 +211,10 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      * @param proof Proof to verify that the caller is allowed to mint
      */
     function mintWhitelist(uint256 nonce, bytes32[] calldata proof) public payable whenNotPaused() onlyWhitelist(nonce, proof) {
-        require((tokenCounter.current() + WHITELIST_MINT_COUNT) <= MAX_SUPPLY, "Not enough supply");
+        require((tokenCounter.current() + WHITELIST_MINT_COUNT) < MAX_SUPPLY, "Not enough supply");
         require(msg.value >= PRICE, "Not enough ETH");
         require((addressToMintCount[msg.sender] + addressToRequestCount[msg.sender]) < WHITELIST_MINT_COUNT, "Already minted");
-        requestMint(msg.sender);
+        requestMint();
     }
 
     /**
