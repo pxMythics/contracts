@@ -103,7 +103,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         unrevealedURI = _unrevealedUri;
     }
 
-    function tokenURI(uint256 tokenId) override public view returns (string memory) {
+    function tokenURI(uint256 tokenId) override public view validTokenId(tokenId) returns (string memory) {
         if (!isRevealed()) {
             return unrevealedURI;
         }
@@ -295,9 +295,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      * @param tokenId id of the token
      * @return traits metadata of the token
      */
-    function getMetadataForTokenId(uint256 tokenId) public view returns (TokenTraits memory traits)  {
-        require(tokenId < MAX_SUPPLY, "Invalid tokenId");
-        require(tokenId > 0, "Invalid tokenId");
+    function getMetadataForTokenId(uint256 tokenId) public view validTokenId(tokenId) returns (TokenTraits memory traits) {
         if (isRevealed()) {
             return tokenIdToTraits[tokenId];
         }
@@ -364,6 +362,17 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      */
     modifier onlyFreeMint(uint256 nonce, bytes32[] memory proof) {
         require(verifyProof(nonce, freeMintMerkleTreeRoot, proof), "Address is not in the free mint list");
+        _;
+    }
+
+
+    /**
+     * Modifier that checks for a valid tokenId
+     * @param tokenId token id
+     */
+    modifier validTokenId(uint256 tokenId) {
+        require(tokenId < MAX_SUPPLY, "Invalid tokenId");
+        require(tokenId > 0, "Invalid tokenId");
         _;
     }
 }

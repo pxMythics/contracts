@@ -389,32 +389,19 @@ describe('Genesis Contract', () => {
   it('Contract base URI is unrevealed URI if not changed', async function () {
     await contract.connect(owner).unpause();
     expect(await contract.tokenURI(1)).to.be.equal(constants.unrevealedURI);
-  });
-
-  it('Contract base URI is unrevealed URI if not changed', async function () {
-    await contract.connect(owner).unpause();
-    expect(await contract.tokenURI(1)).to.be.equal(constants.unrevealedURI);
     expect(await contract.tokenURI(100)).to.be.equal(constants.unrevealedURI);
-    expect(await contract.tokenURI(4000)).to.be.equal(constants.unrevealedURI);
+    await expect(contract.tokenURI(4000)).to.be.revertedWith('Invalid tokenId');
   });
 
   it('Contract base URI is revealed URI if set', async function () {
     await contract.connect(owner).unpause();
     await contract.connect(owner).setBaseURI(constants.revealedURI);
-
-    expect(await contract.tokenURI(1)).to.be.equal(
-      `${constants.unrevealedURI}1`,
-    );
+    expect(await contract.tokenURI(1)).to.be.equal(`${constants.revealedURI}1`);
     expect(await contract.tokenURI(100)).to.be.equal(
-      `${constants.unrevealedURI}100`,
+      `${constants.revealedURI}100`,
     );
-
-    expect(await contract.tokenURI(0)).to.be.equal(
-      `${constants.unrevealedURI}0`,
-    );
-    expect(await contract.tokenURI(9999)).to.be.equal(
-      `${constants.unrevealedURI}9999`,
-    );
+    await expect(contract.tokenURI(0)).to.be.revertedWith('Invalid tokenId');
+    await expect(contract.tokenURI(9999)).to.be.revertedWith('Invalid tokenId');
   });
 
   it('Make sure that the metadata is not available until before the collection is revealed', async function () {
