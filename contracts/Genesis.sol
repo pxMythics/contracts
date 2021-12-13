@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
@@ -42,8 +43,9 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     uint256 public constant DEMI_GODS_MAX_SUPPLY = 400;
     uint256 public constant ELEMENTALS_MAX_SUPPLY = 550;
     uint256 public constant RESERVED_GODS_MAX_SUPPLY = 10;
-    bool public mintActive = false;
+    string public unrevealedURI;
     string public baseTokenURI;
+
     Counters.Counter private tokenCounter;
     Counters.Counter private randomNumberRequestsCounter;
     Counters.Counter private godsCounter;
@@ -58,13 +60,13 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     mapping(address => uint256) private addressToRequestCount;
     bytes32 private whiteListMerkleTreeRoot;
     bytes32 private freeMintMerkleTreeRoot;
-    mapping(uint256 => TokenTraits) public tokenIdToTraits;
+    mapping(uint256 => TokenTraits) private tokenIdToTraits;
 
-    constructor(address vrfCoordinator, address linkToken, bytes32 _keyhash, string memory baseURI) VRFConsumerBase(vrfCoordinator, linkToken) ERC721("Mythical Sega", "MS") {
+    constructor(address vrfCoordinator, address linkToken, bytes32 _keyhash, string memory _unrevealedURI) VRFConsumerBase(vrfCoordinator, linkToken) ERC721("Mythical Sega", "MS") {
         // TODO start other counters at 1 to save on gas
-        setBaseURI(baseURI);
         keyHash = _keyhash;
         fee = 0.1 * 10**18; // 0.1 LINK
+        unrevealedURI = _unrevealedURI;
         
         // reserve 10 gods for owner
         for (uint256 i=0; i < RESERVED_GODS_MAX_SUPPLY; i++) {
@@ -81,30 +83,44 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         return baseTokenURI;
     }
 
+    function isRevealed() internal view returns (bool revealed) {
+        return bytes(baseTokenURI).length > 0;
+    } 
+
     /**
      * Setters
      */
-    function setBaseURI(string memory _baseTokenURI) public onlyOwner {
+    function setBaseURI(string memory _baseTokenURI) external onlyOwner {
         baseTokenURI = _baseTokenURI;
     }
-    function setWhiteListMerkleTreeRoot(bytes32 _whiteListMerkleTreeRoot) public onlyOwner {
+    function setWhiteListMerkleTreeRoot(bytes32 _whiteListMerkleTreeRoot) external onlyOwner {
         whiteListMerkleTreeRoot = _whiteListMerkleTreeRoot;
     }
-    function setFreeMintMerkleTreeRoot(bytes32 _freeMintMerkleTreeRoot) public onlyOwner {
+    function setFreeMintMerkleTreeRoot(bytes32 _freeMintMerkleTreeRoot) external onlyOwner {
         freeMintMerkleTreeRoot = _freeMintMerkleTreeRoot;
+    }
+    function setUnrevealedURI(string memory _unrevealedUri) external onlyOwner {
+        unrevealedURI = _unrevealedUri;
+    }
+
+    function tokenURI(uint256 tokenId) override public view returns (string memory) {
+        if (!isRevealed()) {
+            return unrevealedURI;
+        }
+        return string(abi.encodePacked(baseTokenURI, Strings.toString(tokenId)));
     }
 
     /**
     * Pause contract
     */
-    function pause() public onlyOwner {
+    function pause() external onlyOwner {
         _pause();
     }
 
     /**
     * Unpause contract
     */
-    function unpause() public onlyOwner {
+    function unpause() external onlyOwner {
         _unpause();
     }
 
@@ -185,7 +201,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      */
     function requestMint() private {
         addressToRequestCount[msg.sender]++; // we use ++ directyly because it's never gonna overflow, because amount of mints are limited
-        bytes32 requestId = requestRandomNumberForTokenId(msg.sender, tokenCounter.current() + randomNumberRequestsCounter.current() + 1);
+        bytes32 requestId = requestRandomNumberForTokenId(msg.sender, tokenCounter.current() + randomNumberRequestsCounter.current() + 1); // + 1 since tokenCounter starts at 0
         randomNumberRequestsCounter.increment();
         emit RequestedRandomNFT(requestId);
     }
@@ -196,7 +212,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      * @param maxMintCount maximum number of tokens the user can mint. Also used as a nonce to validate the proof.
      * @param proof Proof to verify that the caller is allowed to mint
      */
-    function freeMint(uint count, uint256 maxMintCount, bytes32[] calldata proof) public whenNotPaused() onlyFreeMint(maxMintCount, proof) {
+    function freeMint(uint count, uint256 maxMintCount, bytes32[] calldata proof) external whenNotPaused() onlyFreeMint(maxMintCount, proof) {
         require((tokenCounter.current() + count) < MAX_SUPPLY, "Not enough supply");
         uint mintCount = addressToMintCount[msg.sender] + addressToRequestCount[msg.sender] + count;
         require(mintCount <= maxMintCount, "Trying to mint more than allowed");
@@ -210,7 +226,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      * @param nonce nonce used to verify that the caller is allowed to mint
      * @param proof Proof to verify that the caller is allowed to mint
      */
-    function mintWhitelist(uint256 nonce, bytes32[] calldata proof) public payable whenNotPaused() onlyWhitelist(nonce, proof) {
+    function mintWhitelist(uint256 nonce, bytes32[] calldata proof) external payable whenNotPaused() onlyWhitelist(nonce, proof) {
         require((tokenCounter.current() + WHITELIST_MINT_COUNT) < MAX_SUPPLY, "Not enough supply");
         require(msg.value >= PRICE, "Not enough ETH");
         require((addressToMintCount[msg.sender] + addressToRequestCount[msg.sender]) < WHITELIST_MINT_COUNT, "Already minted");
@@ -275,6 +291,23 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     }
 
     /**
+     * Returns the metadata of a token
+     * @param tokenId id of the token
+     * @return traits metadata of the token
+     */
+    function getMetadataForTokenId(uint256 tokenId) public view returns (TokenTraits memory traits)  {
+        require(tokenId < MAX_SUPPLY, "Invalid tokenId");
+        require(tokenId > 0, "Invalid tokenId");
+        if (isRevealed()) {
+            return tokenIdToTraits[tokenId];
+        }
+        revert('Not revealed yet');
+        // TODO Add the logic for access control
+        // if (isBackend)
+        // return tokenIdToTraits[tokenId];
+    }
+
+    /**
     * Returns the total supply
     * @return count count of NFTs minted so far
     */
@@ -286,7 +319,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      * Withdraw balance from the contract
      * TODO Add Reentrancy Guard
      */
-    function withdrawAll() public payable onlyOwner {
+    function withdrawAll() external payable onlyOwner {
         uint256 balance = address(this).balance;
         require(balance > 0, "No ether left to withdraw");
         (bool success, ) = (msg.sender).call{value: balance}("");
@@ -306,7 +339,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     * @param to address to send the god to
     * @param count number of gods to transfer
     */
-    function mintReservedGods(address to, uint256 count) public onlyOwner {
+    function mintReservedGods(address to, uint256 count) external onlyOwner {
         require(reservedGodsSupply() >= count, "Not enough reserved gods left");
         for (uint256 i=0; i < count; i++) {
             reservedGodsTransfered.increment();
