@@ -372,9 +372,18 @@ describe('Genesis Contract', () => {
       contract.connect(whitelisted).reservedGodsSupply(),
     ).to.be.revertedWith('Ownable: caller is not the owner');
 
+    // try to mint more reserved gods that are left
+    await expect(
+      contract.connect(owner).mintReservedGods(whitelistedAddr, 20),
+    ).to.be.revertedWith('Not enough reserved gods left');
+    expect(await contract.balanceOf(whitelistedAddr)).to.equal(0);
+    expect(await contract.connect(owner).reservedGodsSupply()).to.equal(10);
+
     // mint 1 reserved god
     await contract.connect(owner).mintReservedGods(whitelistedAddr, 1);
     expect(await contract.balanceOf(whitelistedAddr)).to.equal(1);
+    expect(await contract.connect(owner).reservedGodsSupply()).to.equal(9);
+
     // TODO check metadata if God
     // mint 4 reserved gods
     await contract.connect(owner).mintReservedGods(whitelistedAddr, 4);
@@ -382,8 +391,10 @@ describe('Genesis Contract', () => {
     expect(await contract.connect(owner).reservedGodsSupply()).to.equal(5);
     // try to mint more reserved gods that are left
     await expect(
-      contract.connect(owner).mintReservedGods(whitelistedAddr, 10),
+      contract.connect(owner).mintReservedGods(whitelistedAddr, 6),
     ).to.be.revertedWith('Not enough reserved gods left');
+    expect(await contract.balanceOf(whitelistedAddr)).to.equal(5);
+    expect(await contract.connect(owner).reservedGodsSupply()).to.equal(5);
   });
 
   it('Contract base URI is unrevealed URI if not changed', async function () {

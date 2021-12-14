@@ -172,7 +172,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      */
     function mint(address to, uint256 tokenId, uint256 randomNumber) private {
         tokenCounter.increment();
-        addressToMintCount[to]++; // we use ++ directyly because it's never gonna overflow, because amount of mints are limited
+        addressToMintCount[to]++; // we use ++ directly because it's never gonna overflow, because amount of mints are limited
         TokenType tokenType = getTokenType(randomNumber);     
         if (tokenType == TokenType.GOD) {
             mintGod(to, tokenId);
@@ -192,7 +192,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     function fulfillRandomness(bytes32 requestId, uint256 randomNumber) internal override {
         randomNumberRequestsCounter.decrement();
         address to = requestIdToSender[requestId];
-        addressToRequestCount[to]--; // we use -- directyly because it's never gonna be less than 0
+        addressToRequestCount[to]--; // we use -- directly because it's never gonna be less than 0
         mint(to, requestIdToTokenId[requestId], randomNumber);
     }
 
@@ -200,7 +200,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      * Requests minting
      */
     function requestMint() private {
-        addressToRequestCount[msg.sender]++; // we use ++ directyly because it's never gonna overflow, because amount of mints are limited
+        addressToRequestCount[msg.sender]++; // we use ++ directly because it's never gonna overflow, because amount of mints are limited
         bytes32 requestId = requestRandomNumberForTokenId(msg.sender, tokenCounter.current() + randomNumberRequestsCounter.current() + 1); // + 1 since tokenCounter starts at 0
         randomNumberRequestsCounter.increment();
         emit RequestedRandomNFT(requestId);
@@ -337,8 +337,8 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     * @param to address to send the god to
     * @param count number of gods to transfer
     */
-    function mintReservedGods(address to, uint256 count) external onlyOwner {
-        require(reservedGodsSupply() >= count, "Not enough reserved gods left");
+    function mintReservedGods(address to, uint256 count) public onlyOwner {
+        require(reservedGodsSupply() >= count + reservedGodsTransfered.current(), "Not enough reserved gods left");
         for (uint256 i=0; i < count; i++) {
             reservedGodsTransfered.increment();
             mintGod(to, reservedGodsTransfered.current());
