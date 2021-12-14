@@ -312,10 +312,6 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         internal
         override
     {
-        console.log("Request Id is");
-        console.logBytes32(requestId);
-        console.log("randomizationRequestId is");
-        console.logBytes32(randomizationRequestId);
         require(requestId == randomizationRequestId, "Invalid requestId");
         seed = randomNumber;
     }
