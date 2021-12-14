@@ -4,6 +4,7 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { networkConfig } from '../helper-hardhat-config';
 import { LinkToken } from '../typechain';
 import 'hardhat-ethernal';
+import { constants } from '../test/constants';
 
 const deployGenesis: DeployFunction = async function (
   hre: HardhatRuntimeEnvironment,

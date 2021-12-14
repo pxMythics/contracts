@@ -7,6 +7,7 @@ import '@nomiclabs/hardhat-etherscan';
 import dotenv from 'dotenv';
 import 'hardhat-deploy';
 import 'hardhat-ethernal';
+import 'hardhat-tracer';
 
 dotenv.config();
 const { API_URL, PRIVATE_KEY, ETHERSCAN_API_KEY, REPORT_GAS } = process.env;

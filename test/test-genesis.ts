@@ -4,6 +4,7 @@ import { expect } from 'chai';
 import { Contract, utils } from 'ethers';
 import { ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
+import { constants } from './constants';
 import {
   addLinkFundIfNeeded,
   deployTestContract,
@@ -383,5 +384,54 @@ describe('Genesis Contract', () => {
     await expect(
       contract.connect(owner).mintReservedGods(whitelistedAddr, 10),
     ).to.be.revertedWith('Not enough reserved gods left');
+  });
+
+  it('Contract base URI is unrevealed URI if not changed', async function () {
+    await contract.connect(owner).unpause();
+    expect(await contract.tokenURI(1)).to.be.equal(constants.unrevealedURI);
+    expect(await contract.tokenURI(100)).to.be.equal(constants.unrevealedURI);
+    await expect(contract.tokenURI(4000)).to.be.revertedWith('Invalid tokenId');
+  });
+
+  it('Contract base URI is revealed URI if set', async function () {
+    await contract.connect(owner).unpause();
+    await contract.connect(owner).setBaseURI(constants.revealedURI);
+    expect(await contract.tokenURI(1)).to.be.equal(`${constants.revealedURI}1`);
+    expect(await contract.tokenURI(100)).to.be.equal(
+      `${constants.revealedURI}100`,
+    );
+    await expect(contract.tokenURI(0)).to.be.revertedWith('Invalid tokenId');
+    await expect(contract.tokenURI(9999)).to.be.revertedWith('Invalid tokenId');
+  });
+
+  it('Make sure that the metadata is not available until before the collection is revealed', async function () {
+    await contract.connect(owner).unpause();
+    await expect(
+      contract.connect(owner).getMetadataForTokenId(1),
+    ).to.be.revertedWith('Not revealed yet');
+  });
+
+  it('No metadata is returned if trying to access an invalid token id', async function () {
+    await contract.connect(owner).unpause();
+    await contract.connect(owner).setBaseURI(constants.revealedURI);
+    await expect(
+      contract.connect(owner).getMetadataForTokenId(0),
+    ).to.be.revertedWith('Invalid tokenId');
+    await expect(
+      contract.connect(owner).getMetadataForTokenId(1001),
+    ).to.be.revertedWith('Invalid tokenId');
+    await expect(
+      contract.connect(owner).getMetadataForTokenId(4000),
+    ).to.be.revertedWith('Invalid tokenId');
+  });
+
+  it('Metadata is returned if trying to access a valid token id and collection is revealed', async function () {
+    await contract.connect(owner).unpause();
+    await contract.connect(owner).setBaseURI(constants.revealedURI);
+    // mint 1 reserved god so we can get the metadata
+    await contract.connect(owner).mintReservedGods(whitelisted.address, 1);
+    const metadata = await contract.connect(owner).getMetadataForTokenId(1);
+    console.log(`metadata ${JSON.stringify(metadata)}`);
+    expect(metadata[0]).to.be.equal(0);
   });
 });

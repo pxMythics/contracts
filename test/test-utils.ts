@@ -3,9 +3,10 @@ import { deployments, ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
 import { Contract, ContractReceipt } from 'ethers';
 import { LinkToken } from '../typechain';
+import { constants } from './constants';
 
 export const deployTestContract = async (
-  baseURI: string = 'ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/',
+  baseURI: string = constants.unrevealedURI,
 ): Promise<{
   contract: Contract;
   linkToken: Deployment;
