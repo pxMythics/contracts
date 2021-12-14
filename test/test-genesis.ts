@@ -425,7 +425,7 @@ describe('Genesis Contract', () => {
     ).to.be.revertedWith('Invalid tokenId');
   });
 
-  it('Metadata is returned if trying to access a valid token id', async function () {
+  it('Metadata is returned if trying to access a valid token id and collection is revealed', async function () {
     await contract.connect(owner).unpause();
     await contract.connect(owner).setBaseURI(constants.revealedURI);
     // mint 1 reserved god so we can get the metadata
