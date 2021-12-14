@@ -62,26 +62,26 @@ export const addressZero = (): string =>
   '0x0000000000000000000000000000000000000000';
 
 /**
- * Minting function, use only if you don't need to test the minting flow.
- * @param minter The signer that mints
+ * Setup randomization for minting, this needs to be done before the minting process else it will fail
+ * @param owner Owner of the contract
  * @param contract The Genesis contract
  * @param oracle The oracle
  * @param coordinatorMockAddress The coordinator mock address
+ * @param randomNumber Random number to be used, random if not set
  */
-export const mint = async (
-  minter: SignerWithAddress,
-  nonce: number,
-  proof: string[],
+export const setupRandomization = async (
+  owner: SignerWithAddress,
   contract: Contract,
   oracle: SignerWithAddress,
   coordinatorMockAddress: string,
+  randomNumber: number = Math.floor(Math.random() * 100000),
 ) => {
-  const mintTx = await contract.connect(minter).mintWhitelist(nonce, proof, {
-    value: ethers.utils.parseEther('0.0000001'),
-  });
-  const mintReceipt: ContractReceipt = await mintTx.wait();
-  const requestId = mintReceipt.events?.find(
-    (x: any) => x.event === 'RequestedRandomNFT',
+  const randomizationTx = await contract
+    .connect(owner)
+    .initializeRandomization();
+  const randomizationReceipt: ContractReceipt = await randomizationTx.wait();
+  const requestId = randomizationReceipt.events?.find(
+    (x: any) => x.event === 'RequestedRandomNumber',
   )?.args![0];
 
   const vrfCoordinatorMock = await ethers.getContractAt(
@@ -90,45 +90,9 @@ export const mint = async (
     oracle,
   );
 
-  return vrfCoordinatorMock.callBackWithRandomness(
+  await vrfCoordinatorMock.callBackWithRandomness(
     requestId,
-    Math.floor(Math.random() * 100000),
-    contract.address,
-  );
-};
-
-/**
- * Free mint
- * @param count mint count
- * @param minter The signer that mints
- * @param contract The Genesis contract
- * @param oracle The oracle
- * @param coordinatorMockAddress The coordinator mock address
- */
-export const freeMint = async (
-  count: number,
-  minter: SignerWithAddress,
-  nonce: number,
-  proof: string[],
-  contract: Contract,
-  oracle: SignerWithAddress,
-  coordinatorMockAddress: string,
-) => {
-  const mintTx = await contract.connect(minter).freeMint(count, nonce, proof);
-  const mintReceipt: ContractReceipt = await mintTx.wait();
-  const requestId = mintReceipt.events?.find(
-    (x: any) => x.event === 'RequestedRandomNFT',
-  )?.args![0];
-
-  const vrfCoordinatorMock = await ethers.getContractAt(
-    'VRFCoordinatorMock',
-    coordinatorMockAddress,
-    oracle,
-  );
-
-  return vrfCoordinatorMock.callBackWithRandomness(
-    requestId,
-    Math.floor(Math.random() * 100000),
+    randomNumber,
     contract.address,
   );
 };
