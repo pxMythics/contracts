@@ -143,6 +143,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
                 seed
             );
             _mint(msg.sender, tokenId);
+            emit Minted(tokenId);
         }
     }
 
@@ -168,6 +169,7 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
             seed
         );
         _mint(msg.sender, tokenId);
+        emit Minted(tokenId);
     }
 
     /**

@@ -15,21 +15,31 @@ const deployGenesis: DeployFunction = async function (
   const deployerSigner = await ethers.getSigner(deployer);
   const chainId = await getChainId();
 
-  console.log(`Deploying Genesis on ${chainId}`);
-
   const linkToken = await get('LinkToken');
   const VRFCoordinatorMock = await get('VRFCoordinatorMock');
   const linkTokenAddress = linkToken.address;
   const vrfCoordinatorAddress = VRFCoordinatorMock.address;
   const keyHash: string = networkConfig[chainId].keyHash;
 
+  console.log(`Deploying GenesisSupply on ${chainId}`);
+  const genesisSupply = await deploy('GenesisSupply', {
+    from: deployer,
+    log: true,
+  });
+  await hre.ethernal.push({
+    name: 'GenesisSupply',
+    address: genesisSupply.address,
+  });
+
+  console.log(`Deploying Genesis on ${chainId}`);
   const genesis = await deploy('Genesis', {
     from: deployer,
     args: [
+      genesisSupply.address,
       vrfCoordinatorAddress,
       linkTokenAddress,
       keyHash,
-      'ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/',
+      constants.unrevealedURI,
     ],
     log: true,
   });

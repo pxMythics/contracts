@@ -9,10 +9,10 @@ export const deployTestContract = async (
   baseURI: string = constants.unrevealedURI,
 ): Promise<{
   contract: Contract;
+  supplyContract: Contract;
   linkToken: Deployment;
   vrfCoordinator: Deployment;
 }> => {
-  let owner: SignerWithAddress;
   const LinkToken: Deployment = await deployments.get('LinkToken');
   const VRFCoordinatorMock: Deployment = await deployments.get(
     'VRFCoordinatorMock',
@@ -20,15 +20,31 @@ export const deployTestContract = async (
 
   await deployments.fixture(['Genesis']);
   const GenesisDeployment: Deployment = await deployments.get('Genesis');
-  [owner] = await ethers.getSigners();
+  const signers = await ethers.getSigners();
   const Genesis = await ethers.getContractAt(
     'Genesis',
     GenesisDeployment.address,
-    owner,
+    signers[9],
+  );
+
+  // Set the Genesis contract the proper role on the Supply contract
+  const GenesisSupplyDeployment: Deployment = await deployments.get(
+    'GenesisSupply',
+  );
+  const GenesisSupply = await ethers.getContractAt(
+    'GenesisSupply',
+    GenesisSupplyDeployment.address,
+    signers[9],
+  );
+
+  await GenesisSupply.connect(signers[9]).grantRole(
+    ethers.utils.id('GENESIS_ROLE'),
+    Genesis.address,
   );
 
   return {
     contract: Genesis,
+    supplyContract: GenesisSupply,
     linkToken: LinkToken,
     vrfCoordinator: VRFCoordinatorMock,
   };
