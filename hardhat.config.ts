@@ -8,6 +8,8 @@ import dotenv from 'dotenv';
 import 'hardhat-deploy';
 import 'hardhat-ethernal';
 import 'hardhat-tracer';
+import 'hardhat-log-remover';
+import 'hardhat-contract-sizer';
 
 dotenv.config();
 const { API_URL, PRIVATE_KEY, ETHERSCAN_API_KEY, REPORT_GAS } = process.env;
@@ -62,5 +64,11 @@ module.exports = {
       default: 9,
       1: 9,
     },
+  },
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: true,
   },
 };
