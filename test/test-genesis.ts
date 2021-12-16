@@ -324,6 +324,14 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
       });
 
       it('A user on the whitelist can mint with a valid nonce and proof', async function () {
+        expect(
+          await supplyContract.connect(contract.address).totalSupply(),
+        ).to.equal('10');
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .mintCount(whitelisted.address),
+        ).to.equal('0');
         await expect(
           contract
             .connect(whitelisted)
@@ -331,18 +339,45 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
               value: ethers.utils.parseEther('0.0000001'),
             }),
         ).to.emit(contract, 'Minted');
+        expect(
+          await supplyContract.connect(contract.address).totalSupply(),
+        ).to.equal('11');
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .mintCount(whitelisted.address),
+        ).to.equal('1');
       });
 
       it('A user on the free mint list can mint with a valid nonce and proof', async function () {
+        expect(
+          await supplyContract.connect(contract.address).totalSupply(),
+        ).to.equal('10');
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .mintCount(freeMintListed.address),
+        ).to.equal('0');
         await expect(
           contract
             .connect(freeMintListed)
             .freeMint(2, freeMintNonce, freeMintProof),
         ).to.emit(contract, 'Minted');
+        expect(
+          await supplyContract.connect(contract.address).totalSupply(),
+        ).to.equal('12');
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .mintCount(freeMintListed.address),
+        ).to.equal('2');
       });
 
       // FIXME This needs to be fixed with the new minting of the reserve gods method
       // it('Make sure the contract has 10 reserved gods and that they can be transfered', async function () {
+      // expect(
+      //   await supplyContract.connect(contract.address).totalSupply(),
+      // ).to.equal(constants.totalSupply);
       //   const whitelistedAddr = whitelisted.address;
       //   expect(await contract.connect(owner).reservedGodsSupply()).to.equal(10);
 
@@ -399,16 +434,52 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
       await expect(
         supplyContract.connect(whitelisted).reservedGodsSupply(),
       ).to.be.revertedWith(
-        `AccessControl: account ${whitelisted.address} is missing role ${constants.genesisRole}`,
+        `AccessControl: account ${whitelisted.address.toLowerCase()} is missing role ${
+          constants.genesisRole
+        }`,
       );
       await expect(
         supplyContract.connect(freeMintListed).reservedGodsSupply(),
       ).to.be.revertedWith(
-        `AccessControl: account ${freeMintListed.address} is missing role ${constants.genesisRole}`,
+        `AccessControl: account ${freeMintListed.address.toLowerCase()} is missing role ${
+          constants.genesisRole
+        }`,
       );
       expect(
         await supplyContract.connect(contract.address).reservedGodsSupply(),
       ).to.equal(10);
+    });
+
+    it('Only the Genesis can access the mint. ONLY FOR TESTING, SHOULD NOT BE DONE MANUALLY', async () => {
+      await expect(
+        supplyContract.connect(whitelisted).mint(whitelisted.address, 10),
+      ).to.be.revertedWith(
+        `AccessControl: account ${whitelisted.address.toLowerCase()} is missing role ${
+          constants.genesisRole
+        }`,
+      );
+      await expect(
+        supplyContract.connect(freeMintListed).mint(freeMintListed.address, 10),
+      ).to.be.revertedWith(
+        `AccessControl: account ${freeMintListed.address.toLowerCase()} is missing role ${
+          constants.genesisRole
+        }`,
+      );
+      // FIXME This test does not run for some reason, minor detail as we know we should not do that
+      // Note it returns 11 here cause we mint 10 at the construction, this could change
+      // expect(
+      //   await supplyContract
+      //     .connect(contract.address)
+      //     .mint(contract.address, 10),
+      // ).to.equal('11');
+      // expect(
+      //   await supplyContract.connect(contract.address).totalSupply(),
+      // ).to.equal('11');
+      // expect(
+      //   await supplyContract
+      //     .connect(contract.address)
+      //     .mintCount(whitelisted.address),
+      // ).to.equal('1');
     });
 
     it('Make sure that the metadata is not available until before the collection is revealed', async function () {
