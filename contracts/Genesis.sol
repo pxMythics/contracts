@@ -172,27 +172,17 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         emit Minted(tokenId);
     }
 
-    /**
-     * Mint reserved gods
-     * @param to address to send the god to
-     * @param count number of gods to transfer
-     */
-    // function mintReservedGods(address to, uint256 count) public onlyOwner {
-    //     require(
-    //         GenesisSupply.reservedGodsSupply() >=
-    //             count + GenesisSupply.reservedGodsTransfered.current(),
-    //         "Not enough reserved gods left"
-    //     );
-    //     // Here we don't need to increment counter and god supply counter because we already do in the constructor
-    //     // to not initialize the counters at 0
-    //     for (uint256 i = 0; i < count; i++) {
-    //         GenesisSupply.reservedGodsTransfered.increment();
-    //         GenesisSupply.mintGod(
-    //             to,
-    //             GenesisSupply.reservedGodsTransfered.current()
-    //         );
-    //     }
-    // }
+    function mintReservedGods(uint256 count) external onlyOwner {
+        require(
+            GenesisSupply(genesisSupplyAddress).reservedGodsSupply() >= count,
+            "Not enough reserved gods left"
+        );
+        GenesisSupply(genesisSupplyAddress).mintReservedGods(count);
+        for (uint256 i = 0; i < count; i++) {
+            _mint(msg.sender, i);
+            emit Minted(i);
+        }
+    }
 
     /**
      * Will request a random number from Chainlink to be stored privately in the contract

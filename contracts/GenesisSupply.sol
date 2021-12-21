@@ -105,6 +105,10 @@ contract GenesisSupply is AccessControl {
     }
 
     /**
+     * Minting functions
+     */
+
+    /**
      * Mint a god
      * @param tokenId id of the token to be minted
      */
@@ -174,6 +178,23 @@ contract GenesisSupply is AccessControl {
     }
 
     /**
+     * Mint reserved gods
+     * @param count number of gods to transfer
+     */
+    function mintReservedGods(uint256 count) public onlyRole(GENESIS_ROLE) {
+        // Here we don't need to increment counter and god supply counter because we already do in the constructor
+        // to not initialize the counters at 0
+        for (uint256 i = 0; i < count; i++) {
+            reservedGodsTransfered.increment();
+            mintGod(reservedGodsTransfered.current());
+        }
+    }
+
+    /**
+     * Metadata functions
+     */
+
+    /**
      * @dev Generates a uint256 random number from seed, nonce and transaction block
      * @param seed The seed to be used for the randomization
      * @param nonce The nonce to be used for the randomization
@@ -236,6 +257,10 @@ contract GenesisSupply is AccessControl {
         }
         revert("Not revealed yet");
     }
+
+    /**
+     *  Modifiers
+     */
 
     /**
      * Modifier that checks for a valid tokenId
