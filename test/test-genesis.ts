@@ -21,6 +21,7 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
   let whitelisted: SignerWithAddress; // 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
   let notWhitelisted: SignerWithAddress;
   let freeMintListed: SignerWithAddress; // 0x976EA74026E726554dB657fA54763abd0C3a0aa9
+  let backend: SignerWithAddress;
   const whiteListMerkleTreeRoot =
     '0xe32689cba5d4fa1698e45bcc090b47a13a1ea9c41671c5205bebeecd5b9ebb7f';
   const whiteListNonce = 0;
@@ -65,6 +66,7 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
     whitelisted = signers[2];
     notWhitelisted = signers[4];
     freeMintListed = signers[6];
+    backend = signers[8];
     const deployedContracts = await deployTestContract();
     contract = deployedContracts.contract;
     supplyContract = deployedContracts.supplyContract;
@@ -482,7 +484,23 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
       // ).to.equal('1');
     });
 
-    it('Make sure that the metadata is not available until before the collection is revealed', async function () {
+    it('Backend has access to metadata before reveal date', async () => {
+      await expect(
+        supplyContract.connect(backend.address).getMetadataForTokenId(1),
+      ).to.be.revertedWith('Not revealed yet');
+
+      await supplyContract
+        .connect(owner)
+        .grantRole(constants.backendRole, backend.address);
+
+      // TODO Update when metadata is available
+      const metadata = await supplyContract
+        .connect(backend.address)
+        .getMetadataForTokenId(1);
+      expect(metadata).to.be.equal(metadata);
+    });
+
+    it('Metadata is not available until before the collection is revealed', async function () {
       await expect(
         supplyContract.connect(contract.address).getMetadataForTokenId(1),
       ).to.be.revertedWith('Not revealed yet');
