@@ -182,10 +182,10 @@ contract GenesisSupply is AccessControl {
      * @param count number of gods to transfer
      */
     function mintReservedGods(uint256 count) public onlyRole(GENESIS_ROLE) {
-        uint256 currentIndex = reservedGodsTransfered.current();
+        uint256 nextIndex = reservedGodsCurrentIndex();
         // Here we don't need to increment counter and god supply counter because we already do in the constructor
         // to not initialize the counters at 0
-        for (uint256 i = currentIndex; i < count + currentIndex; i++) {
+        for (uint256 i = nextIndex; i < count + nextIndex; i++) {
             reservedGodsTransfered.increment();
             tokenIdToTraits[i] = TokenTraits(TokenType.GOD);
         }

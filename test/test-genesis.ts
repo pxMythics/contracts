@@ -139,7 +139,7 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
       ).to.be.revertedWith('Seed already generated');
     });
 
-    describe('Invalid minting process', () => {
+    describe('Invalid contract setup', () => {
       it('Should not allow minting if contract is paused', async function () {
         await expect(
           contract.mintWhitelist(whiteListNonce, whiteListProof),
@@ -190,121 +190,154 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
             .freeMint(1, freeMintNonce, freeMintProof),
         ).to.be.revertedWith('Address is not in the free mint list');
       });
+    });
 
-      describe('Contract properly setup', () => {
-        beforeEach(async () => {
-          await contract.connect(owner).unpause();
-          await setupRandomization(
-            owner,
-            contract,
-            oracle,
-            VRFCoordinatorMock.address,
-          );
-          await contract
-            .connect(owner)
-            .setWhiteListMerkleTreeRoot(whiteListMerkleTreeRoot);
-          await contract
-            .connect(owner)
-            .setFreeMintMerkleTreeRoot(freeMintMerkleTreeRoot);
-        });
-        it('Cannot mint more if not enough ETH is sent', async function () {
-          await expect(
-            contract
-              .connect(whitelisted)
-              .mintWhitelist(whiteListNonce, whiteListProof, {
-                value: ethers.utils.parseEther('0.000000000001'),
-              }),
-          ).to.be.revertedWith('Not enough ETH');
-        });
+    describe('Contract properly setup', () => {
+      beforeEach(async () => {
+        await contract.connect(owner).unpause();
+        await setupRandomization(
+          owner,
+          contract,
+          oracle,
+          VRFCoordinatorMock.address,
+        );
+        await contract
+          .connect(owner)
+          .setWhiteListMerkleTreeRoot(whiteListMerkleTreeRoot);
+        await contract
+          .connect(owner)
+          .setFreeMintMerkleTreeRoot(freeMintMerkleTreeRoot);
+      });
+      it('Cannot mint more if not enough ETH is sent', async function () {
+        await expect(
+          contract
+            .connect(whitelisted)
+            .mintWhitelist(whiteListNonce, whiteListProof, {
+              value: ethers.utils.parseEther('0.000000000001'),
+            }),
+        ).to.be.revertedWith('Not enough ETH');
+      });
 
-        it('A user on the whitelist cannot mint if the proof is not valid', async function () {
-          await expect(
-            contract
-              .connect(whitelisted)
-              .mintWhitelist(whiteListNonce, bogusProof),
-          ).to.be.revertedWith('Address is not in the whitelist');
-        });
+      it('A user on the whitelist cannot mint if the proof is not valid', async function () {
+        await expect(
+          contract
+            .connect(whitelisted)
+            .mintWhitelist(whiteListNonce, bogusProof),
+        ).to.be.revertedWith('Address is not in the whitelist');
+      });
 
-        it('A user on the whitelist cannot mint if the nonce is not valid', async function () {
-          await expect(
-            contract
-              .connect(whitelisted)
-              .mintWhitelist(bogusNonce, whiteListProof),
-          ).to.be.revertedWith('Address is not in the whitelist');
-        });
+      it('A user on the whitelist cannot mint if the nonce is not valid', async function () {
+        await expect(
+          contract
+            .connect(whitelisted)
+            .mintWhitelist(bogusNonce, whiteListProof),
+        ).to.be.revertedWith('Address is not in the whitelist');
+      });
 
-        it('Cannot mint more than the max mint per account', async function () {
-          // first mint
-          await contract
+      it('Cannot mint more than the max mint per account', async function () {
+        // first mint
+        await contract
+          .connect(whitelisted)
+          .mintWhitelist(whiteListNonce, whiteListProof, {
+            value: ethers.utils.parseEther('0.0000001'),
+          });
+        // second mint should fail
+        await expect(
+          contract
             .connect(whitelisted)
             .mintWhitelist(whiteListNonce, whiteListProof, {
               value: ethers.utils.parseEther('0.0000001'),
-            });
-          // second mint should fail
-          await expect(
-            contract
-              .connect(whitelisted)
-              .mintWhitelist(whiteListNonce, whiteListProof, {
-                value: ethers.utils.parseEther('0.0000001'),
-              }),
-          ).to.be.revertedWith('Already minted');
-        });
+            }),
+        ).to.be.revertedWith('Already minted');
+      });
 
-        it('Cannot mint if the user is not on the whitelist', async function () {
-          await expect(
-            contract
-              .connect(notWhitelisted)
-              .mintWhitelist(whiteListNonce, whiteListProof),
-          ).to.be.revertedWith('Address is not in the whitelist');
-        });
+      it('Cannot mint if the user is not on the whitelist', async function () {
+        await expect(
+          contract
+            .connect(notWhitelisted)
+            .mintWhitelist(whiteListNonce, whiteListProof),
+        ).to.be.revertedWith('Address is not in the whitelist');
+      });
 
-        it('Cannot free mint if the user is not on the free mint list', async function () {
-          await expect(
-            contract
-              .connect(whitelisted)
-              .freeMint(1, whiteListNonce, whiteListProof),
-          ).to.be.revertedWith('Address is not in the free mint list');
-          await expect(
-            contract
-              .connect(notWhitelisted)
-              .freeMint(1, whiteListNonce, whiteListProof),
-          ).to.be.revertedWith('Address is not in the free mint list');
-        });
+      it('Cannot free mint if the user is not on the free mint list', async function () {
+        await expect(
+          contract
+            .connect(whitelisted)
+            .freeMint(1, whiteListNonce, whiteListProof),
+        ).to.be.revertedWith('Address is not in the free mint list');
+        await expect(
+          contract
+            .connect(notWhitelisted)
+            .freeMint(1, whiteListNonce, whiteListProof),
+        ).to.be.revertedWith('Address is not in the free mint list');
+      });
 
-        it('A user on the free mint list cannot mint if the nonce is not valid', async function () {
-          await expect(
-            contract
-              .connect(freeMintListed)
-              .freeMint(1, bogusNonce, freeMintProof),
-          ).to.be.revertedWith('Address is not in the free mint list');
-        });
-        it('A user on the free mint list cannot mint if the proof is not valid', async function () {
-          await expect(
-            contract
-              .connect(freeMintListed)
-              .freeMint(1, freeMintNonce, bogusProof),
-          ).to.be.revertedWith('Address is not in the free mint list');
-        });
+      it('A user on the free mint list cannot mint if the nonce is not valid', async function () {
+        await expect(
+          contract
+            .connect(freeMintListed)
+            .freeMint(1, bogusNonce, freeMintProof),
+        ).to.be.revertedWith('Address is not in the free mint list');
+      });
+      it('A user on the free mint list cannot mint if the proof is not valid', async function () {
+        await expect(
+          contract
+            .connect(freeMintListed)
+            .freeMint(1, freeMintNonce, bogusProof),
+        ).to.be.revertedWith('Address is not in the free mint list');
+      });
 
-        it('A user on the free mint list cannot mint more than the maximum amount allowed', async function () {
-          await expect(
-            contract
-              .connect(freeMintListed)
-              .freeMint(6, freeMintNonce, freeMintProof),
-          ).to.be.revertedWith('Trying to mint more than allowed');
+      it('A user on the free mint list cannot mint more than the maximum amount allowed', async function () {
+        await expect(
+          contract
+            .connect(freeMintListed)
+            .freeMint(6, freeMintNonce, freeMintProof),
+        ).to.be.revertedWith('Trying to mint more than allowed');
 
-          // Multiple transactions
-          await expect(
-            contract
-              .connect(freeMintListed)
-              .freeMint(2, freeMintNonce, freeMintProof),
-          ).to.emit(contract, 'Minted');
-          await expect(
-            contract
-              .connect(freeMintListed)
-              .freeMint(3, freeMintNonce, freeMintProof),
-          ).to.be.revertedWith('Trying to mint more than allowed');
-        });
+        // Multiple transactions
+        await expect(
+          contract
+            .connect(freeMintListed)
+            .freeMint(2, freeMintNonce, freeMintProof),
+        ).to.emit(contract, 'Minted');
+        await expect(
+          contract
+            .connect(freeMintListed)
+            .freeMint(3, freeMintNonce, freeMintProof),
+        ).to.be.revertedWith('Trying to mint more than allowed');
+      });
+      it('Owner cannot mint more than the reserved gods', async function () {
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .reservedGodsCurrentIndex(),
+        ).to.equal('0');
+        // try to mint more reserved gods that are left
+        await expect(
+          contract.connect(owner).mintReservedGods(20),
+        ).to.be.revertedWith('Not enough reserved gods left');
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .reservedGodsCurrentIndex(),
+        ).to.equal('0');
+      });
+
+      it('Owner cannot mint 0 the reserved gods', async function () {
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .reservedGodsCurrentIndex(),
+        ).to.equal('0');
+        // try to mint more reserved gods that are left
+        await expect(contract.connect(owner).mintReservedGods(0))
+          .to.not.emit(contract, 'Minted')
+          .withArgs('0');
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .reservedGodsCurrentIndex(),
+        ).to.equal('0');
       });
     });
 
@@ -327,7 +360,7 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
 
       it('A user on the whitelist can mint with a valid nonce and proof', async function () {
         expect(
-          await supplyContract.connect(contract.address).totalSupply(),
+          await supplyContract.connect(contract.address).currentIndex(),
         ).to.equal('10');
         expect(
           await supplyContract
@@ -340,73 +373,127 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
             .mintWhitelist(whiteListNonce, whiteListProof, {
               value: ethers.utils.parseEther('0.0000001'),
             }),
-        ).to.emit(contract, 'Minted');
+        )
+          .to.emit(contract, 'Minted')
+          .withArgs('10');
         expect(
-          await supplyContract.connect(contract.address).totalSupply(),
+          await supplyContract.connect(contract.address).currentIndex(),
         ).to.equal('11');
         expect(
           await supplyContract
             .connect(contract.address)
             .mintCount(whitelisted.address),
         ).to.equal('1');
+        expect(await contract.balanceOf(whitelisted.address)).to.equal('1');
       });
 
       it('A user on the free mint list can mint with a valid nonce and proof', async function () {
         expect(
-          await supplyContract.connect(contract.address).totalSupply(),
+          await supplyContract.connect(contract.address).currentIndex(),
         ).to.equal('10');
         expect(
           await supplyContract
             .connect(contract.address)
             .mintCount(freeMintListed.address),
         ).to.equal('0');
-        await expect(
-          contract
-            .connect(freeMintListed)
-            .freeMint(2, freeMintNonce, freeMintProof),
-        ).to.emit(contract, 'Minted');
+
+        const multipleFreeMintTx = await contract
+          .connect(freeMintListed)
+          .freeMint(2, freeMintNonce, freeMintProof);
+        const multipleFreeMintReceipt = await multipleFreeMintTx.wait();
+        let freeMintIndex = 10;
+        for (const event of multipleFreeMintReceipt.events) {
+          if (event.event === 'Minted') {
+            expect(event.args[0].toNumber()).to.equal(freeMintIndex);
+            freeMintIndex++;
+          }
+        }
+
         expect(
-          await supplyContract.connect(contract.address).totalSupply(),
+          await supplyContract.connect(contract.address).currentIndex(),
         ).to.equal('12');
         expect(
           await supplyContract
             .connect(contract.address)
             .mintCount(freeMintListed.address),
         ).to.equal('2');
+        expect(await contract.balanceOf(freeMintListed.address)).to.equal('2');
       });
 
-      // FIXME This needs to be fixed with the new minting of the reserve gods method
-      // it('Make sure the contract has 10 reserved gods and that they can be transfered', async function () {
-      // expect(
-      //   await supplyContract.connect(contract.address).totalSupply(),
-      // ).to.equal(constants.totalSupply);
-      //   const whitelistedAddr = whitelisted.address;
-      //   expect(await contract.connect(owner).reservedGodsSupply()).to.equal(10);
+      it('Mint the 10 reserved gods (single transaction)', async function () {
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .reservedGodsCurrentIndex(),
+        ).to.equal('0');
+        const multipleFreeMintTx = await contract
+          .connect(owner)
+          .mintReservedGods(10);
+        const multipleFreeMintReceipt = await multipleFreeMintTx.wait();
+        let freeMintIndex = 0;
+        for (const event of multipleFreeMintReceipt.events) {
+          if (event.event === 'Minted') {
+            expect(event.args[0].toNumber()).to.equal(freeMintIndex);
+            freeMintIndex++;
+          }
+        }
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .reservedGodsCurrentIndex(),
+        ).to.equal('10');
 
-      //   // try to mint more reserved gods that are left
-      //   await expect(
-      //     contract.connect(owner).mintReservedGods(whitelistedAddr, 20),
-      //   ).to.be.revertedWith('Not enough reserved gods left');
-      //   expect(await contract.balanceOf(whitelistedAddr)).to.equal(0);
-      //   expect(await contract.connect(owner).reservedGodsSupply()).to.equal(10);
+        expect(await contract.balanceOf(owner.address)).to.equal('10');
+        await expect(
+          contract.connect(owner).mintReservedGods(1),
+        ).to.be.revertedWith('Not enough reserved gods left');
+      });
 
-      //   // mint 1 reserved god
-      //   await contract.connect(owner).mintReservedGods(whitelistedAddr, 1);
-      //   expect(await contract.balanceOf(whitelistedAddr)).to.equal(1);
-      //   expect(await contract.connect(owner).reservedGodsSupply()).to.equal(9);
+      it('Mint the 10 reserved gods (multiple transaction)', async function () {
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .reservedGodsCurrentIndex(),
+        ).to.equal('0');
+        let multipleFreeMintTx = await contract
+          .connect(owner)
+          .mintReservedGods(3);
+        let multipleFreeMintReceipt = await multipleFreeMintTx.wait();
+        let freeMintIndex = 0;
+        for (const event of multipleFreeMintReceipt.events) {
+          if (event.event === 'Minted') {
+            expect(event.args[0].toNumber()).to.equal(freeMintIndex);
+            freeMintIndex++;
+          }
+        }
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .reservedGodsCurrentIndex(),
+        ).to.equal('3');
 
-      //   // TODO check metadata if God
-      //   // mint 4 reserved gods
-      //   await contract.connect(owner).mintReservedGods(whitelistedAddr, 4);
-      //   expect(await contract.balanceOf(whitelistedAddr)).to.equal(5);
-      //   expect(await contract.connect(owner).reservedGodsSupply()).to.equal(5);
-      //   // try to mint more reserved gods that are left
-      //   await expect(
-      //     contract.connect(owner).mintReservedGods(whitelistedAddr, 6),
-      //   ).to.be.revertedWith('Not enough reserved gods left');
-      //   expect(await contract.balanceOf(whitelistedAddr)).to.equal(5);
-      //   expect(await contract.connect(owner).reservedGodsSupply()).to.equal(5);
-      // });
+        expect(await contract.balanceOf(owner.address)).to.equal('3');
+
+        multipleFreeMintTx = await contract.connect(owner).mintReservedGods(7);
+        multipleFreeMintReceipt = await multipleFreeMintTx.wait();
+        for (const event of multipleFreeMintReceipt.events) {
+          if (event.event === 'Minted') {
+            expect(event.args[0].toNumber()).to.equal(freeMintIndex);
+            freeMintIndex++;
+          }
+        }
+
+        expect(
+          await supplyContract
+            .connect(contract.address)
+            .reservedGodsCurrentIndex(),
+        ).to.equal('10');
+
+        expect(await contract.balanceOf(owner.address)).to.equal('10');
+        await expect(
+          contract.connect(owner).mintReservedGods(1),
+        ).to.be.revertedWith('Not enough reserved gods left');
+      });
     });
 
     it('Contract base URI is unrevealed URI if not changed', async function () {
@@ -432,24 +519,26 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
       expect(await supplyContract.MAX_SUPPLY()).to.equal(1000);
     });
 
-    it('Only the Genesis can access the reservedGodSupply', async () => {
+    it('Only the Genesis can access the reservedGodsCurrentIndex', async () => {
       await expect(
-        supplyContract.connect(whitelisted).reservedGodsSupply(),
+        supplyContract.connect(whitelisted).reservedGodsCurrentIndex(),
       ).to.be.revertedWith(
         `AccessControl: account ${whitelisted.address.toLowerCase()} is missing role ${
           constants.genesisRole
         }`,
       );
       await expect(
-        supplyContract.connect(freeMintListed).reservedGodsSupply(),
+        supplyContract.connect(freeMintListed).reservedGodsCurrentIndex(),
       ).to.be.revertedWith(
         `AccessControl: account ${freeMintListed.address.toLowerCase()} is missing role ${
           constants.genesisRole
         }`,
       );
       expect(
-        await supplyContract.connect(contract.address).reservedGodsSupply(),
-      ).to.equal(10);
+        await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndex(),
+      ).to.equal(0);
     });
 
     it('Only the Genesis can access the mint. ONLY FOR TESTING, SHOULD NOT BE DONE MANUALLY', async () => {
@@ -475,7 +564,7 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
       //     .mint(contract.address, 10),
       // ).to.equal('11');
       // expect(
-      //   await supplyContract.connect(contract.address).totalSupply(),
+      //   await supplyContract.connect(contract.address).currentIndex(),
       // ).to.equal('11');
       // expect(
       //   await supplyContract
