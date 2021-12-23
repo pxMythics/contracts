@@ -1,7 +1,7 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { deployments, ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
-import { Contract, ContractReceipt } from 'ethers';
+import { Contract, ContractReceipt, Wallet } from 'ethers';
 import { LinkToken } from '../typechain';
 import { constants } from './constants';
 
@@ -112,4 +112,31 @@ export const setupRandomization = async (
     randomNumber,
     contract.address,
   );
+};
+
+export const createRandomWallet = async (
+  funder: SignerWithAddress,
+): Promise<Wallet> => {
+  let wallet = ethers.Wallet.createRandom();
+  // TODO: Validate if needed
+  wallet = wallet.connect(funder.provider!);
+  const sendFundsTx = {
+    from: funder.address,
+    to: wallet.address,
+    value: ethers.utils.parseEther('0.1'),
+  };
+
+  await funder.sendTransaction(sendFundsTx);
+  return wallet;
+};
+
+export const createRandomWallets = async (
+  count: number,
+  funder: SignerWithAddress,
+): Promise<Wallet[]> => {
+  const wallets: Wallet[] = [];
+  for (let i = 0; i < count; i++) {
+    wallets.push(await createRandomWallet(funder));
+  }
+  return wallets;
 };

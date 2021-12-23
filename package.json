@@ -58,6 +58,8 @@
     "hardhat-gas-reporter": "^1.0.4",
     "hardhat-log-remover": "^2.0.2",
     "hardhat-tracer": "^1.0.0-alpha.6",
+    "keccak256": "^1.0.6",
+    "merkletreejs": "^0.2.27",
     "prettier": "^2.5.0",
     "prettier-plugin-solidity": "^1.0.0-beta.13",
     "solhint": "^3.3.6",
