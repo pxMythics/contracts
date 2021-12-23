@@ -33,14 +33,15 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     uint256 public constant WHITELIST_MINT_COUNT = 1;
     string public unrevealedURI;
     string public baseTokenURI;
-
-    address genesisSupplyAddress;
+    mapping(address => uint256) private addressToMaxFreeMintCount;
 
     /**
      * Merkle tree properties
      */
     bytes32 private whiteListMerkleTreeRoot;
     bytes32 private freeMintMerkleTreeRoot;
+
+    address genesisSupplyAddress;
 
     constructor(
         address _genesisSupplyAddress,
@@ -124,24 +125,22 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     /**
      * Free mint
      * @param count number of tokens to mint
-     * @param maxMintCount maximum number of tokens the user can mint. Also used as a nonce to validate the proof.
+     * @param nonce used to verify that the caller is allowed to mint
      * @param proof Proof to verify that the caller is allowed to mint
      */
     function freeMint(
         uint256 count,
-        uint256 maxMintCount,
+        uint256 nonce,
         bytes32[] calldata proof
-    ) external whenNotPaused seedGenerated onlyFreeMint(maxMintCount, proof) {
-        uint256 mintCount = GenesisSupply(genesisSupplyAddress).mintCount(
-            msg.sender
-        ) + count;
-        require(mintCount <= maxMintCount, "Trying to mint more than allowed");
+    ) external whenNotPaused seedGenerated onlyFreeMint(nonce, proof) {
+        uint256 mintCount = balanceOf(msg.sender) + count;
+        require(
+            mintCount <= addressToMaxFreeMintCount[msg.sender],
+            "Trying to mint more than allowed"
+        );
         uint256 tokenId;
         for (uint256 i = 0; i < count; i++) {
-            tokenId = GenesisSupply(genesisSupplyAddress).mint(
-                msg.sender,
-                seed
-            );
+            tokenId = GenesisSupply(genesisSupplyAddress).mint(seed);
             _mint(msg.sender, tokenId);
             emit Minted(tokenId);
         }
@@ -160,14 +159,9 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         onlyWhitelist(nonce, proof)
     {
         require(msg.value >= PRICE, "Not enough ETH");
-        uint256 mintCount = GenesisSupply(genesisSupplyAddress).mintCount(
-            msg.sender
-        );
+        uint256 mintCount = balanceOf(msg.sender);
         require(mintCount < WHITELIST_MINT_COUNT, "Already minted");
-        uint256 tokenId = GenesisSupply(genesisSupplyAddress).mint(
-            msg.sender,
-            seed
-        );
+        uint256 tokenId = GenesisSupply(genesisSupplyAddress).mint(seed);
         _mint(msg.sender, tokenId);
         emit Minted(tokenId);
     }
@@ -193,6 +187,16 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
             _mint(msg.sender, i);
             emit Minted(i);
         }
+    }
+
+    /**
+     * Add an address to the free mint count
+     * @param to address of free minter
+     * @param maxCount max free mint allowed for address
+     */
+    function addFreeMinter(address to, uint256 maxCount) external onlyOwner {
+        require(addressToMaxFreeMintCount[to] == 0, "Already added");
+        addressToMaxFreeMintCount[to] = maxCount;
     }
 
     /**

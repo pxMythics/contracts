@@ -42,7 +42,6 @@ contract GenesisSupply is AccessControl {
      * Minting properties
      */
     mapping(uint256 => TokenTraits) private tokenIdToTraits;
-    mapping(address => uint256) private addressToMintCount;
 
     /**
      * Utils
@@ -78,15 +77,6 @@ contract GenesisSupply is AccessControl {
      */
     function currentIndex() public view returns (uint256 index) {
         return tokenCounter.current();
-    }
-
-    function mintCount(address to)
-        external
-        view
-        onlyRole(GENESIS_ROLE)
-        returns (uint256 count)
-    {
-        return addressToMintCount[to];
     }
 
     /**
@@ -151,10 +141,9 @@ contract GenesisSupply is AccessControl {
 
     /**
      * Mint a token
-     * @param to address of the NFT owner
      * @param seed Seed for the random number to be generated
      */
-    function mint(address to, uint256 seed)
+    function mint(uint256 seed)
         public
         onlyRole(GENESIS_ROLE)
         returns (uint256)
@@ -163,7 +152,6 @@ contract GenesisSupply is AccessControl {
         uint256 tokenId = tokenCounter.current();
         uint256 randomNumber = generateRandomNumber(seed, tokenId);
         tokenCounter.increment();
-        addressToMintCount[to]++; // we use ++ directly because it's never gonna overflow, because amount of mints are limited
         // TODO Modify this to generate the token type at a later time
         TokenType tokenType = getTokenType(randomNumber);
         if (tokenType == TokenType.GOD) {
