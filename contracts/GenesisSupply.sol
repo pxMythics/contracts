@@ -4,8 +4,9 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
-contract GenesisSupply is AccessControl {
+contract GenesisSupply is VRFConsumerBase, AccessControl {
     using SafeMath for uint256;
     using Counters for Counters.Counter;
 
@@ -19,6 +20,13 @@ contract GenesisSupply is AccessControl {
         TokenType tokenType;
         // TODO add other traits
     }
+
+    /**
+     * Chainlink VRF
+     */
+    bytes32 internal keyHash;
+    uint256 internal fee;
+    bytes32 private randomizationRequestId;
 
     /**
      * Supply
@@ -47,13 +55,26 @@ contract GenesisSupply is AccessControl {
      * Utils
      */
     bool public isRevealed;
+    bool public isMetadataGenerated;
     bytes32 public constant GENESIS_ROLE = keccak256("GENESIS_ROLE");
     bytes32 public constant BACKEND_ROLE = keccak256("BACKEND_ROLE");
 
-    constructor() {
+    event Minted(uint256 tokenId);
+    event CollectionRandomized();
+    // TODO Remove on final contract, for dev only
+    event RequestedRandomNumber(bytes32 indexed requestId);
+
+    constructor(
+        address vrfCoordinator,
+        address linkToken,
+        bytes32 _keyhash
+    ) VRFConsumerBase(vrfCoordinator, linkToken) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         // TODO start other counters at 1 to save on gas
+        keyHash = _keyhash;
+        fee = 0.1 * 10**18; // 0.1 LINK
         isRevealed = false;
+        isMetadataGenerated = false;
         // reserve 10 gods for owner
         for (uint256 i = 0; i < RESERVED_GODS_MAX_SUPPLY; i++) {
             godsCounter.increment();
@@ -97,70 +118,13 @@ contract GenesisSupply is AccessControl {
      */
 
     /**
-     * Mint a god
-     * @param tokenId id of the token to be minted
-     */
-    function mintGod(uint256 tokenId) private {
-        require(
-            godsCounter.current() < GODS_MAX_SUPPLY,
-            "Not enough gods left"
-        );
-        godsCounter.increment();
-        tokenIdToTraits[tokenId] = TokenTraits(TokenType.GOD);
-    }
-
-    /**
-     * Mint a demi-god
-     * @param tokenId id of the token to be minted
-     * @param randomNumber random number used to generate traits
-     */
-    function mintDemiGod(uint256 tokenId, uint256 randomNumber) private {
-        require(
-            demiGodsCounter.current() < DEMI_GODS_MAX_SUPPLY,
-            "Not enough demi-gods left"
-        );
-        demiGodsCounter.increment();
-        // TODO add other traits
-        tokenIdToTraits[tokenId] = TokenTraits(TokenType.DEMI_GOD);
-    }
-
-    /**
-     * Mint an elemental
-     * @param tokenId id of the token to be minted
-     * @param randomNumber random number used to generate traits
-     */
-    function mintElemental(uint256 tokenId, uint256 randomNumber) private {
-        require(
-            elementalsCounter.current() < ELEMENTALS_MAX_SUPPLY,
-            "Not enough elementals left"
-        );
-        elementalsCounter.increment();
-        // TODO add other traits
-        tokenIdToTraits[tokenId] = TokenTraits(TokenType.ELEMENTAL);
-    }
-
-    /**
      * Mint a token
-     * @param seed Seed for the random number to be generated
      */
-    function mint(uint256 seed)
-        public
-        onlyRole(GENESIS_ROLE)
-        returns (uint256)
-    {
+    function mint() public onlyRole(GENESIS_ROLE) returns (uint256) {
         require(tokenCounter.current() < MAX_SUPPLY, "Not enough supply");
         uint256 tokenId = tokenCounter.current();
-        uint256 randomNumber = generateRandomNumber(seed, tokenId);
         tokenCounter.increment();
-        // TODO Modify this to generate the token type at a later time
-        TokenType tokenType = getTokenType(randomNumber);
-        if (tokenType == TokenType.GOD) {
-            mintGod(tokenId);
-        } else if (tokenType == TokenType.DEMI_GOD) {
-            mintDemiGod(tokenId, randomNumber);
-        } else {
-            mintElemental(tokenId, randomNumber);
-        }
+        emit Minted(tokenId);
         return tokenId;
     }
 
@@ -180,8 +144,50 @@ contract GenesisSupply is AccessControl {
     }
 
     /**
+     * Will request a random number from Chainlink to be stored privately in the contract
+     */
+    function randomizeCollection() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(tokenCounter.current() == MAX_SUPPLY - 1, "Not all minted");
+        require(
+            reservedGodsTransfered.current() == RESERVED_GODS_MAX_SUPPLY - 1,
+            "Not all reserve minted"
+        );
+        require(randomizationRequestId == 0, "Randomization already started");
+        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
+        randomizationRequestId = requestRandomness(keyHash, fee);
+        emit RequestedRandomNumber(randomizationRequestId);
+    }
+
+    /**
+     * Callback when a random number gets generated
+     * @param requestId id of the request sent to Chainlink
+     * @param randomNumber random number returned by Chainlink
+     */
+    function fulfillRandomness(bytes32 requestId, uint256 randomNumber)
+        internal
+        override
+    {
+        require(requestId == randomizationRequestId, "Invalid requestId");
+        generateCollectionTraits(randomNumber);
+    }
+
+    /**
      * Metadata functions
      */
+
+    /**
+     * Generate the collection traits from a seed (from ChainLink)
+     * @param seed The sed to be used for randomization
+     */
+    function generateCollectionTraits(uint256 seed) private {
+        // Here we start at 10 because the 10 first tokens are reserved gods
+        for (uint256 i = 10; i < MAX_SUPPLY; i++) {
+            tokenIdToTraits[i] = TokenTraits(
+                getTokenType(generateRandomNumber(seed, i))
+            );
+        }
+        emit CollectionRandomized();
+    }
 
     /**
      * @dev Generates a uint256 random number from seed, nonce and transaction block
@@ -237,6 +243,7 @@ contract GenesisSupply is AccessControl {
         validTokenId(tokenId)
         returns (TokenTraits memory traits)
     {
+        require(randomizationRequestId > 0, "Collection not randomized");
         // Backend has access to metadata before anyone
         if (hasRole(BACKEND_ROLE, msg.sender)) {
             return tokenIdToTraits[tokenId];
