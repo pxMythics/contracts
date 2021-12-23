@@ -237,6 +237,9 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
         await expect(
           contract.connect(whitelisted).freeMint(1),
         ).to.be.revertedWith('Address is not in the free mint list');
+
+        await contract.connect(owner).addFreeMinter(freeMintListed.address, 4);
+
         await expect(
           contract.connect(notWhitelisted).freeMint(1),
         ).to.be.revertedWith('Address is not in the free mint list');
@@ -490,14 +493,6 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
           constants.genesisRole
         }`,
       );
-      // Note it returns 11 here cause we mint 10 at the construction, this could change
-      expect(await supplyContract.connect(contract.address).mint(10)).to.equal(
-        11,
-      );
-      expect(
-        await supplyContract.connect(contract.address).currentIndex(),
-      ).to.equal(11);
-      expect(await contract.balanceOf(contract.address)).to.equal(10);
     });
 
     it('Backend has access to metadata before reveal date', async () => {
