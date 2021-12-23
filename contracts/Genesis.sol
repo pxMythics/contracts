@@ -39,7 +39,6 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
      * Merkle tree properties
      */
     bytes32 private whiteListMerkleTreeRoot;
-    bytes32 private freeMintMerkleTreeRoot;
 
     address genesisSupplyAddress;
 
@@ -84,13 +83,6 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         whiteListMerkleTreeRoot = _whiteListMerkleTreeRoot;
     }
 
-    function setFreeMintMerkleTreeRoot(bytes32 _freeMintMerkleTreeRoot)
-        external
-        onlyOwner
-    {
-        freeMintMerkleTreeRoot = _freeMintMerkleTreeRoot;
-    }
-
     function setUnrevealedURI(string memory _unrevealedUri) external onlyOwner {
         unrevealedURI = _unrevealedUri;
     }
@@ -125,14 +117,12 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     /**
      * Free mint
      * @param count number of tokens to mint
-     * @param nonce used to verify that the caller is allowed to mint
-     * @param proof Proof to verify that the caller is allowed to mint
      */
-    function freeMint(
-        uint256 count,
-        uint256 nonce,
-        bytes32[] calldata proof
-    ) external whenNotPaused seedGenerated onlyFreeMint(nonce, proof) {
+    function freeMint(uint256 count) external whenNotPaused seedGenerated {
+        require(
+            addressToMaxFreeMintCount[msg.sender] > 0,
+            "Address is not in the free mint list"
+        );
         uint256 mintCount = balanceOf(msg.sender) + count;
         require(
             mintCount <= addressToMaxFreeMintCount[msg.sender],
@@ -156,8 +146,11 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         payable
         whenNotPaused
         seedGenerated
-        onlyWhitelist(nonce, proof)
     {
+        require(
+            verifyProof(nonce, whiteListMerkleTreeRoot, proof),
+            "Address is not in the whitelist"
+        );
         require(msg.value >= PRICE, "Not enough ETH");
         uint256 mintCount = balanceOf(msg.sender);
         require(mintCount < WHITELIST_MINT_COUNT, "Already minted");
@@ -260,32 +253,6 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         require(balance > 0, "No ether left to withdraw");
         (bool success, ) = (msg.sender).call{value: balance}("");
         require(success, "Transfer failed.");
-    }
-
-    /**
-     * Modifier that limits the function to whitelist members only
-     * @param nonce nonce to be used
-     * @param proof proof
-     */
-    modifier onlyWhitelist(uint256 nonce, bytes32[] memory proof) {
-        require(
-            verifyProof(nonce, whiteListMerkleTreeRoot, proof),
-            "Address is not in the whitelist"
-        );
-        _;
-    }
-
-    /**
-     * Modifier that limits the function to free mint list members only
-     * @param nonce nonce to be used
-     * @param proof proof
-     */
-    modifier onlyFreeMint(uint256 nonce, bytes32[] memory proof) {
-        require(
-            verifyProof(nonce, freeMintMerkleTreeRoot, proof),
-            "Address is not in the free mint list"
-        );
-        _;
     }
 
     /**
