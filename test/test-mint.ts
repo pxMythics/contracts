@@ -1,78 +1,80 @@
-/* eslint-disable no-unused-expressions */
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { expect } from 'chai';
 import { Contract } from 'ethers';
 import { ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
+import { generateMerkleTree } from './merkle-tree-utils';
 import {
-  addressZero,
+  createRandomWallets,
   deployTestContract,
-  addLinkFundIfNeeded,
+  setupRandomization,
 } from './test-utils';
-import fs from 'fs';
 
 describe('Genesis full minting function', function () {
   let contract: Contract;
   let VRFCoordinatorMock: Deployment;
   let owner: SignerWithAddress;
   let oracle: SignerWithAddress;
+  let funder: SignerWithAddress;
 
   beforeEach(async () => {
     const signers = await ethers.getSigners();
     owner = signers[9];
     oracle = signers[1];
-    const deployedContracts = await deployTestContract(owner.toString());
+    funder = signers[2];
+    const deployedContracts = await deployTestContract();
     contract = deployedContracts.contract;
     VRFCoordinatorMock = deployedContracts.vrfCoordinator;
-    // TODO: Perhaps this should be only applied on test where it is needed cause it creates a transaction each time
-    await addLinkFundIfNeeded(contract, owner);
+    await contract.connect(owner).unpause();
+    await setupRandomization(
+      owner,
+      contract,
+      oracle,
+      VRFCoordinatorMock.address,
+    );
   });
 
   this.timeout(5000000);
 
-  it('Testing complete mint', async function () {
-    await contract.connect(owner).flipMintActive();
-    expect(await contract.mintActive()).to.be.true;
-    const writeStream = fs.createWriteStream(
-      './doc/minting-distribution-tests.csv',
-      { flags: 'a' },
+  it('Testing complete mint (whitelist only)', async function () {
+    console.log('Generating the random wallets...');
+    // 991 addresses because 10 tokens are reserved for gods
+    // We create a 991 addresses to test minting all the supply and making sure we do in fact run out of supply
+    // TODO Add reserved mint
+    const minterWallets = await createRandomWallets(991, funder);
+    const { treeRoot, proofs } = generateMerkleTree(
+      minterWallets.map((wallet) => wallet.address),
     );
-    writeStream.write(`Run #5\n`);
-    for (let i = 0; i < 1000; i++) {
-      const mintTx = await contract
-        .connect(owner)
-        .mintWhitelist(
-          0,
-          [
-            '0x0ffde5c80d693e686066165e79e1aa33f44b9b3b61ab358e9cda2cfa5988c2af',
-          ],
-          { value: ethers.utils.parseEther('0.0000001') },
-        );
-      const mintReceipt = await mintTx.wait();
-      const requestId = mintReceipt.events?.find(
-        (x: any) => x.event === 'RequestedRandomNFT',
-      ).args[0];
 
-      const vrfCoordinatorMock = await ethers.getContractAt(
-        'VRFCoordinatorMock',
-        VRFCoordinatorMock.address,
-        oracle,
-      );
+    console.log('Random wallets generated');
+    console.log('Starting the mint process...');
+    await contract.connect(owner).setWhiteListMerkleTreeRoot(treeRoot);
 
+    for (let i = 0; i < 990; i++) {
       await expect(
-        vrfCoordinatorMock.callBackWithRandomness(
-          requestId,
-          Math.floor(Math.random() * 100000),
-          contract.address,
-        ),
+        contract
+          .connect(minterWallets[i])
+          .mintWhitelist(
+            proofs[minterWallets[i].address].nonce,
+            proofs[minterWallets[i].address].proof,
+            {
+              value: ethers.utils.parseEther('0.0000001'),
+            },
+          ),
       )
-        .to.emit(contract, 'Transfer')
-        .withArgs(addressZero(), owner.address, (i + 1).toString());
-
-      const tokenType = await contract.tokenIdToTokenType(i + 1);
-      writeStream.write(`${i + 1},${tokenType}\n`);
+        .to.emit(contract, 'Minted')
+        .withArgs(i + 10);
     }
-    writeStream.write('\n');
-    writeStream.end();
+    await expect(
+      contract
+        .connect(minterWallets[990])
+        .mintWhitelist(
+          proofs[minterWallets[990].address].nonce,
+          proofs[minterWallets[990].address].proof,
+          {
+            value: ethers.utils.parseEther('0.0000001'),
+          },
+        ),
+    ).to.be.revertedWith('Not enough supply');
   });
 });
