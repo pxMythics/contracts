@@ -43,7 +43,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
   const bogusProof = [
     '0x0ffde5c80d693e686066165e79e1aa33f44b9b3b61ab358e9cda2cfa5988c2af',
   ];
-  //
+  // Remove warnings
   ethers.utils.Logger.setLogLevel(Logger.levels.ERROR);
 
   beforeEach(async () => {

@@ -37,7 +37,7 @@ describe('Genesis full minting function', function () {
   // To make sure the test dont fail due to timeout
   this.timeout(5000000);
 
-  it('Testing complete mint (whitelist only)', async function () {
+  it('Testing complete mint', async function () {
     console.log('Generating the random wallets...');
     // 981 addresses because 10 tokens are reserved for gods and 10 for free minters (with 2 each)
     // We create a 971 addresses to test minting all the supply and making sure we do in fact run out of supply
