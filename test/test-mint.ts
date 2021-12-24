@@ -1,17 +1,18 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { expect } from 'chai';
-import { Contract } from 'ethers';
 import { ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
+import { Genesis, GenesisSupply } from '../typechain';
 import { generateMerkleTree } from './merkle-tree-utils';
 import {
   createRandomWallets,
   deployTestContract,
-  setupRandomization,
+  generateSeed,
 } from './test-utils';
 
 describe('Genesis full minting function', function () {
-  let contract: Contract;
+  let contract: Genesis;
+  let supplyContract: GenesisSupply;
   let VRFCoordinatorMock: Deployment;
   let owner: SignerWithAddress;
   let oracle: SignerWithAddress;
@@ -24,14 +25,9 @@ describe('Genesis full minting function', function () {
     funder = signers[2];
     const deployedContracts = await deployTestContract();
     contract = deployedContracts.contract;
+    supplyContract = deployedContracts.supplyContract;
     VRFCoordinatorMock = deployedContracts.vrfCoordinator;
     await contract.connect(owner).unpause();
-    await setupRandomization(
-      owner,
-      contract,
-      oracle,
-      VRFCoordinatorMock.address,
-    );
   });
 
   // To make sure the test dont fail due to timeout
@@ -64,9 +60,9 @@ describe('Genesis full minting function', function () {
       .mintReservedGods(10);
     const multipleFreeMintReceipt = await multipleFreeMintTx.wait();
     let freeMintIndex = 0;
-    for (const event of multipleFreeMintReceipt.events) {
+    for (const event of multipleFreeMintReceipt.events || []) {
       if (event.event === 'Minted') {
-        expect(event.args[0].toNumber()).to.equal(freeMintIndex);
+        expect(event.args![0].toNumber()).to.equal(freeMintIndex);
         freeMintIndex++;
       }
     }
@@ -79,9 +75,9 @@ describe('Genesis full minting function', function () {
       const multipleFreeMintReceipt = await multipleFreeMintTx.wait();
       // 10 reserved, i * 2 because each free mint has 2.
       let freeMintIndex = 10 + i * 2;
-      for (const event of multipleFreeMintReceipt.events) {
+      for (const event of multipleFreeMintReceipt.events || []) {
         if (event.event === 'Minted') {
-          expect(event.args[0].toNumber()).to.equal(freeMintIndex);
+          expect(event.args![0].toNumber()).to.equal(freeMintIndex);
           freeMintIndex++;
         }
       }
@@ -104,6 +100,17 @@ describe('Genesis full minting function', function () {
         // 10 reserved, 20 free mints
         .withArgs(i + 30);
     }
+
+    console.log('Randomizing collection...');
+    await generateSeed(
+      supplyContract,
+      owner,
+      oracle,
+      VRFCoordinatorMock.address,
+    );
+    await expect(
+      supplyContract.connect(owner).generateCollectionTraits(),
+    ).to.emit(supplyContract, 'CollectionRandomized');
 
     console.log('Minting over the limit...');
     await expect(

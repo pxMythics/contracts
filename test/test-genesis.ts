@@ -5,6 +5,7 @@ import { Contract, utils } from 'ethers';
 import { Logger } from 'ethers/lib/utils';
 import { ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
+import { Genesis, GenesisSupply } from '../typechain';
 import { constants } from './constants';
 import {
   addLinkFundIfNeeded,
@@ -15,8 +16,8 @@ import {
 } from './test-utils';
 
 describe('Genesis Contract and GenesisSupply Contract', function () {
-  let contract: Contract;
-  let supplyContract: Contract;
+  let contract: Genesis;
+  let supplyContract: GenesisSupply;
   let VRFCoordinatorMock: Deployment;
   let owner: SignerWithAddress;
   let oracle: SignerWithAddress;
@@ -267,9 +268,9 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           .freeMint(2);
         const multipleFreeMintReceipt = await multipleFreeMintTx.wait();
         let freeMintIndex = 10;
-        for (const event of multipleFreeMintReceipt.events) {
+        for (const event of multipleFreeMintReceipt.events || []) {
           if (event.event === 'Transfer') {
-            expect(event.args[2].toNumber()).to.equal(freeMintIndex);
+            expect(event.args![2].toNumber()).to.equal(freeMintIndex);
             freeMintIndex++;
           }
         }
@@ -291,9 +292,9 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           .mintReservedGods(10);
         const multipleFreeMintReceipt = await multipleFreeMintTx.wait();
         let freeMintIndex = 0;
-        for (const event of multipleFreeMintReceipt.events) {
+        for (const event of multipleFreeMintReceipt.events || []) {
           if (event.event === 'Transfer') {
-            expect(event.args[2].toNumber()).to.equal(freeMintIndex);
+            expect(event.args![2].toNumber()).to.equal(freeMintIndex);
             freeMintIndex++;
           }
         }
@@ -320,9 +321,9 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           .mintReservedGods(3);
         let multipleFreeMintReceipt = await multipleFreeMintTx.wait();
         let freeMintIndex = 0;
-        for (const event of multipleFreeMintReceipt.events) {
+        for (const event of multipleFreeMintReceipt.events || []) {
           if (event.event === 'Transfer') {
-            expect(event.args[2].toNumber()).to.equal(freeMintIndex);
+            expect(event.args![2].toNumber()).to.equal(freeMintIndex);
             freeMintIndex++;
           }
         }
@@ -336,9 +337,9 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
 
         multipleFreeMintTx = await contract.connect(owner).mintReservedGods(7);
         multipleFreeMintReceipt = await multipleFreeMintTx.wait();
-        for (const event of multipleFreeMintReceipt.events) {
+        for (const event of multipleFreeMintReceipt.events || []) {
           if (event.event === 'Transfer') {
-            expect(event.args[2].toNumber()).to.equal(freeMintIndex);
+            expect(event.args![2].toNumber()).to.equal(freeMintIndex);
             freeMintIndex++;
           }
         }

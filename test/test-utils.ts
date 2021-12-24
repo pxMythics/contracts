@@ -1,15 +1,15 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { Contract, ContractReceipt, ContractTransaction, Wallet } from 'ethers';
+import { Contract, ContractReceipt, Wallet } from 'ethers';
 import { deployments, ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
-import { LinkToken } from '../typechain';
+import { Genesis, GenesisSupply, LinkToken } from '../typechain';
 import { constants } from './constants';
 
 export const deployTestContract = async (
   baseURI: string = constants.unrevealedURI,
 ): Promise<{
-  contract: Contract;
-  supplyContract: Contract;
+  contract: Genesis;
+  supplyContract: GenesisSupply;
   linkToken: Deployment;
   vrfCoordinator: Deployment;
 }> => {
@@ -112,7 +112,7 @@ export const createRandomWallets = async (
  * @param freeMinter Signer that will free mint
  */
 export const fullMint = async (
-  contract: Contract,
+  contract: Genesis,
   owner: SignerWithAddress,
   freeMinter: SignerWithAddress,
 ) => {
@@ -131,7 +131,7 @@ export const fullMint = async (
  * @param randomNumber Random number to use
  */
 export const generateSeed = async (
-  supplyContract: Contract,
+  supplyContract: GenesisSupply,
   owner: SignerWithAddress,
   oracle: SignerWithAddress,
   coordinatorMockAddress: string,
