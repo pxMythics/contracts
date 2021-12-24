@@ -24,8 +24,9 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     /**
      * Chainlink VRF
      */
-    bytes32 internal keyHash;
-    uint256 internal fee;
+    bytes32 private keyHash;
+    uint256 private fee;
+    uint256 private seed;
     bytes32 private randomizationRequestId;
 
     /**
@@ -146,13 +147,14 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     /**
      * Will request a random number from Chainlink to be stored privately in the contract
      */
-    function randomizeCollection() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(tokenCounter.current() == MAX_SUPPLY - 1, "Not all minted");
+    function generateSeed() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(seed == 0, "Seed already generated");
+        require(randomizationRequestId == 0, "Randomization already started");
         require(
-            reservedGodsTransfered.current() == RESERVED_GODS_MAX_SUPPLY - 1,
+            reservedGodsTransfered.current() == RESERVED_GODS_MAX_SUPPLY,
             "Not all reserve minted"
         );
-        require(randomizationRequestId == 0, "Randomization already started");
+        require(tokenCounter.current() == MAX_SUPPLY, "Not all minted");
         require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
         randomizationRequestId = requestRandomness(keyHash, fee);
         emit RequestedRandomNumber(randomizationRequestId);
@@ -168,7 +170,8 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         override
     {
         require(requestId == randomizationRequestId, "Invalid requestId");
-        generateCollectionTraits(randomNumber);
+        require(seed == 0, "Seed already generated");
+        seed = randomNumber;
     }
 
     /**
@@ -177,27 +180,31 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
 
     /**
      * Generate the collection traits from a seed (from ChainLink)
-     * @param seed The sed to be used for randomization
      */
-    function generateCollectionTraits(uint256 seed) private {
+    function generateCollectionTraits()
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        seedGenerated
+    {
         // Here we start at 10 because the 10 first tokens are reserved gods
         for (uint256 i = 10; i < MAX_SUPPLY; i++) {
             tokenIdToTraits[i] = TokenTraits(
-                getTokenType(generateRandomNumber(seed, i))
+                getTokenType(generateRandomNumber(i))
             );
         }
+        isMetadataGenerated = true;
         emit CollectionRandomized();
     }
 
     /**
      * @dev Generates a uint256 random number from seed, nonce and transaction block
-     * @param seed The seed to be used for the randomization
      * @param nonce The nonce to be used for the randomization
      * @return randomNumber random number generated
      */
-    function generateRandomNumber(uint256 seed, uint256 nonce)
+    function generateRandomNumber(uint256 nonce)
         private
         view
+        seedGenerated
         returns (uint256 randomNumber)
     {
         return
@@ -240,10 +247,11 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     function getMetadataForTokenId(uint256 tokenId)
         public
         view
+        seedGenerated
         validTokenId(tokenId)
         returns (TokenTraits memory traits)
     {
-        require(randomizationRequestId > 0, "Collection not randomized");
+        require(isMetadataGenerated, "Collection not randomized");
         // Backend has access to metadata before anyone
         if (hasRole(BACKEND_ROLE, msg.sender)) {
             return tokenIdToTraits[tokenId];
@@ -265,6 +273,14 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     modifier validTokenId(uint256 tokenId) {
         require(tokenId < MAX_SUPPLY, "Invalid tokenId");
         require(tokenId > 0, "Invalid tokenId");
+        _;
+    }
+
+    /**
+     * Modifier that checks if seed is generated
+     */
+    modifier seedGenerated() {
+        require(seed > 0, "Seed not generated");
         _;
     }
 }
