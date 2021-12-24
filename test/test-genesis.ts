@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-expressions */
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { expect } from 'chai';
-import { Contract, ContractReceipt, utils } from 'ethers';
+import { Contract, utils } from 'ethers';
 import { Logger } from 'ethers/lib/utils';
 import { ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
@@ -10,9 +10,11 @@ import {
   addLinkFundIfNeeded,
   addressZero,
   deployTestContract,
+  fullMint,
+  generateSeed,
 } from './test-utils';
 
-describe('Genesis Contract and GenesisSupply Contract', () => {
+describe('Genesis Contract and GenesisSupply Contract', function () {
   let contract: Contract;
   let supplyContract: Contract;
   let VRFCoordinatorMock: Deployment;
@@ -59,6 +61,9 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
     // TODO: Perhaps this should be only applied on test where it is needed cause it creates a transaction each time
     await addLinkFundIfNeeded(supplyContract, owner);
   });
+
+  // To make sure the test dont fail due to timeout
+  this.timeout(5000000);
 
   describe('Genesis Contract', () => {
     // TODO Adjust with real values
@@ -414,6 +419,18 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
     });
 
     it('Backend has access to metadata before reveal date', async () => {
+      await contract.connect(owner).unpause();
+      await fullMint(contract, owner, freeMintListed);
+      await generateSeed(
+        supplyContract,
+        owner,
+        oracle,
+        VRFCoordinatorMock.address,
+      );
+      await expect(
+        supplyContract.connect(owner).generateCollectionTraits(),
+      ).to.emit(supplyContract, 'CollectionRandomized');
+
       await expect(
         supplyContract.connect(backend.address).getMetadataForTokenId(1),
       ).to.be.revertedWith('Not revealed yet');
@@ -429,54 +446,81 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
       expect(metadata).to.be.equal(metadata);
     });
 
-    it('Should not be able to randomize collection if not all tokens are minted', async () => {
-      // TODO Add full mint process here using smock
-      await expect(
-        supplyContract.connect(owner).randomizeCollection(),
-      ).to.be.revertedWith('Not all minted');
-    });
-
     it('Should not be able to randomize collection if not all reserve is minted', async () => {
-      // TODO Add reserve mint process here using smock
+      await contract.connect(owner).unpause();
       await expect(
-        supplyContract.connect(owner).randomizeCollection(),
+        supplyContract.connect(owner).generateSeed(),
+      ).to.be.revertedWith('Not all reserve minted');
+      await contract.connect(owner).mintReservedGods(7);
+      await expect(
+        supplyContract.connect(owner).generateSeed(),
       ).to.be.revertedWith('Not all reserve minted');
     });
 
-    it('Should not be able to randomize collection twice', async () => {
-      // TODO Add full mint process here using smock
-      const randomizationTx = await supplyContract
-        .connect(owner)
-        .randomizeCollection();
-      const randomizationReceipt: ContractReceipt =
-        await randomizationTx.wait();
-      const requestId = randomizationReceipt.events?.find(
-        (x: any) => x.event === 'RequestedRandomNumber',
-      )?.args![0];
-      const vrfCoordinatorMock = await ethers.getContractAt(
-        'VRFCoordinatorMock',
-        VRFCoordinatorMock.address,
-        oracle,
-      );
+    it('Should not be able to randomize collection if not all tokens are minted', async () => {
+      await contract.connect(owner).unpause();
+      await contract.connect(owner).addFreeMinter(freeMintListed.address, 2);
+      await contract.connect(owner).mintReservedGods(10);
+      await expect(
+        supplyContract.connect(owner).generateSeed(),
+      ).to.be.revertedWith('Not all minted');
+      await contract.connect(freeMintListed).freeMint(2);
+      await expect(
+        supplyContract.connect(owner).generateSeed(),
+      ).to.be.revertedWith('Not all minted');
+    });
 
-      await vrfCoordinatorMock.callBackWithRandomness(
-        requestId,
-        1,
-        contract.address,
+    it('Should not be able to randomize collection twice', async () => {
+      await contract.connect(owner).unpause();
+      await fullMint(contract, owner, freeMintListed);
+      await generateSeed(
+        supplyContract,
+        owner,
+        oracle,
+        VRFCoordinatorMock.address,
       );
 
       await expect(
-        contract.connect(owner).randomizeCollection(),
+        supplyContract.connect(owner).generateSeed(),
       ).to.be.revertedWith('Seed already generated');
     });
+
+    it('Should not be able to randomize collection twice before ChainLink callback', async () => {
+      await contract.connect(owner).unpause();
+      await fullMint(contract, owner, freeMintListed);
+      await supplyContract.connect(owner).generateSeed();
+      await expect(
+        supplyContract.connect(owner).generateSeed(),
+      ).to.be.revertedWith('Randomization already started');
+    });
+
     it('Metadata is not available until before the collection is randomized', async function () {
+      await contract.connect(owner).unpause();
+      await fullMint(contract, owner, freeMintListed);
+      await generateSeed(
+        supplyContract,
+        owner,
+        oracle,
+        VRFCoordinatorMock.address,
+      );
       await expect(
         supplyContract.connect(contract.address).getMetadataForTokenId(1),
       ).to.be.revertedWith('Collection not randomized');
     });
 
     it('Metadata is not available until before the collection is revealed', async function () {
-      // TODO Add full mint process here using smock
+      await contract.connect(owner).unpause();
+      await fullMint(contract, owner, freeMintListed);
+      await generateSeed(
+        supplyContract,
+        owner,
+        oracle,
+        VRFCoordinatorMock.address,
+      );
+      await expect(
+        supplyContract.connect(owner).generateCollectionTraits(),
+      ).to.emit(supplyContract, 'CollectionRandomized');
+
       await expect(
         supplyContract.connect(contract.address).getMetadataForTokenId(1),
       ).to.be.revertedWith('Not revealed yet');
@@ -485,7 +529,17 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
     it('No metadata is returned if trying to access an invalid token id', async function () {
       await contract.connect(owner).unpause();
       await contract.connect(owner).setBaseURI(constants.revealedURI);
-      // TODO Add full mint process here using smock
+      await fullMint(contract, owner, freeMintListed);
+      await generateSeed(
+        supplyContract,
+        owner,
+        oracle,
+        VRFCoordinatorMock.address,
+      );
+
+      await expect(
+        supplyContract.connect(owner).generateCollectionTraits(),
+      ).to.emit(supplyContract, 'CollectionRandomized');
       await expect(
         supplyContract.connect(contract.address).getMetadataForTokenId(0),
       ).to.be.revertedWith('Invalid tokenId');
@@ -498,12 +552,33 @@ describe('Genesis Contract and GenesisSupply Contract', () => {
     });
 
     it('Metadata is returned if trying to access a valid token id and collection is revealed', async function () {
-      // TODO Add full mint process here using smock
       await contract.connect(owner).unpause();
       await contract.connect(owner).setBaseURI(constants.revealedURI);
-      // await supplyContract.connect(owner).mintReservedGods(1);
-      // const metadata = await contract.connect(owner).getMetadataForTokenId(1);
-      // expect(metadata[0]).to.be.equal(0);
+      await fullMint(contract, owner, freeMintListed);
+      await generateSeed(
+        supplyContract,
+        owner,
+        oracle,
+        VRFCoordinatorMock.address,
+      );
+
+      await expect(
+        supplyContract.connect(owner).generateCollectionTraits(),
+      ).to.emit(supplyContract, 'CollectionRandomized');
+
+      // Metadata for token 0-9 are all Gods, since 0 is default value, we test over 9
+      let foundNonGodMetadata = false;
+      let i = 9;
+      let metadata;
+      while (!foundNonGodMetadata) {
+        metadata = await supplyContract.getMetadataForTokenId(i);
+        console.log(
+          `checking id ${i} with metadata being ${JSON.stringify(metadata)}`,
+        );
+        foundNonGodMetadata = metadata[0] > 0;
+        i++;
+      }
+      expect(metadata[i]).to.not.be.equal(0);
     });
   });
 });

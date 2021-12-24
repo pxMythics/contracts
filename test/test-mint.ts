@@ -34,6 +34,7 @@ describe('Genesis full minting function', function () {
     );
   });
 
+  // To make sure the test dont fail due to timeout
   this.timeout(5000000);
 
   it('Testing complete mint (whitelist only)', async function () {

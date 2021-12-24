@@ -1,7 +1,7 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { Contract, ContractReceipt, ContractTransaction, Wallet } from 'ethers';
 import { deployments, ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
-import { Contract, ContractReceipt, Wallet } from 'ethers';
 import { LinkToken } from '../typechain';
 import { constants } from './constants';
 
@@ -103,4 +103,54 @@ export const createRandomWallets = async (
     wallets.push(await createRandomWallet(funder));
   }
   return wallets;
+};
+
+/**
+ * Fully mint the contract using free mints and reserved
+ * @param contract The contract to mint
+ * @param owner Owner of contract
+ * @param freeMinter Signer that will free mint
+ */
+export const fullMint = async (
+  contract: Contract,
+  owner: SignerWithAddress,
+  freeMinter: SignerWithAddress,
+) => {
+  // Add a free minter that can mint everything
+  await contract.connect(owner).addFreeMinter(freeMinter.address, 990);
+  await contract.connect(owner).mintReservedGods(10);
+  await contract.connect(freeMinter).freeMint(990);
+};
+
+/**
+ * Generate the seed for the supply contract
+ * @param supplyContract The supply contract
+ * @param owner Owner of the contract
+ * @param oracle The oracle for the VRFCoordinator
+ * @param coordinatorMockAddress Mock address
+ * @param randomNumber Random number to use
+ */
+export const generateSeed = async (
+  supplyContract: Contract,
+  owner: SignerWithAddress,
+  oracle: SignerWithAddress,
+  coordinatorMockAddress: string,
+  randomNumber: number = Math.floor(Math.random() * 100000),
+) => {
+  const randomizationTx = await supplyContract.connect(owner).generateSeed();
+  const randomizationReceipt: ContractReceipt = await randomizationTx.wait();
+  const requestId = randomizationReceipt.events?.find(
+    (x: any) => x.event === 'RequestedRandomNumber',
+  )?.args![0];
+  const vrfCoordinatorMock = await ethers.getContractAt(
+    'VRFCoordinatorMock',
+    coordinatorMockAddress,
+    oracle,
+  );
+
+  await vrfCoordinatorMock.callBackWithRandomness(
+    requestId,
+    randomNumber,
+    supplyContract.address,
+  );
 };
