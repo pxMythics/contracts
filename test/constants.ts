@@ -6,4 +6,5 @@ export const constants = {
   revealedURI:
     'ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/revealed/',
   genesisRole: ethers.utils.id('GENESIS_ROLE'),
+  backendRole: ethers.utils.id('BACKEND_ROLE'),
 };

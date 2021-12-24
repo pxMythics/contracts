@@ -48,6 +48,7 @@ contract GenesisSupply is AccessControl {
      */
     bool public isRevealed;
     bytes32 public constant GENESIS_ROLE = keccak256("GENESIS_ROLE");
+    bytes32 public constant BACKEND_ROLE = keccak256("BACKEND_ROLE");
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -226,13 +227,14 @@ contract GenesisSupply is AccessControl {
         validTokenId(tokenId)
         returns (TokenTraits memory traits)
     {
+        // Backend has access to metadata before anyone
+        if (hasRole(BACKEND_ROLE, msg.sender)) {
+            return tokenIdToTraits[tokenId];
+        }
         if (isRevealed) {
             return tokenIdToTraits[tokenId];
         }
         revert("Not revealed yet");
-        // TODO Add the logic for access control
-        // if (isBackend)
-        // return tokenIdToTraits[tokenId];
     }
 
     /**

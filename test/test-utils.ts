@@ -21,10 +21,11 @@ export const deployTestContract = async (
   await deployments.fixture(['Genesis']);
   const GenesisDeployment: Deployment = await deployments.get('Genesis');
   const signers = await ethers.getSigners();
+  const owner = signers[9];
   const Genesis = await ethers.getContractAt(
     'Genesis',
     GenesisDeployment.address,
-    signers[9],
+    owner,
   );
 
   // Set the Genesis contract the proper role on the Supply contract
@@ -34,11 +35,11 @@ export const deployTestContract = async (
   const GenesisSupply = await ethers.getContractAt(
     'GenesisSupply',
     GenesisSupplyDeployment.address,
-    signers[9],
+    owner,
   );
 
-  await GenesisSupply.connect(signers[9]).grantRole(
-    ethers.utils.id('GENESIS_ROLE'),
+  await GenesisSupply.connect(owner).grantRole(
+    constants.genesisRole,
     Genesis.address,
   );
 
