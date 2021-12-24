@@ -173,26 +173,27 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     }
 
     /**
-     * Mint reserved gods
-     * @param to address to send the god to
-     * @param count number of gods to transfer
+     * Function to mint the reserved gods
+     * TODO Add a to address to send directly to a wallet
+     * TODO Maybe we should remove the count and have this function run once to make it more simple
+     * @param count number of gods to mint from the reserved pool
      */
-    // function mintReservedGods(address to, uint256 count) public onlyOwner {
-    //     require(
-    //         GenesisSupply.reservedGodsSupply() >=
-    //             count + GenesisSupply.reservedGodsTransfered.current(),
-    //         "Not enough reserved gods left"
-    //     );
-    //     // Here we don't need to increment counter and god supply counter because we already do in the constructor
-    //     // to not initialize the counters at 0
-    //     for (uint256 i = 0; i < count; i++) {
-    //         GenesisSupply.reservedGodsTransfered.increment();
-    //         GenesisSupply.mintGod(
-    //             to,
-    //             GenesisSupply.reservedGodsTransfered.current()
-    //         );
-    //     }
-    // }
+    function mintReservedGods(uint256 count) external onlyOwner {
+        require(
+            GenesisSupply(genesisSupplyAddress).reservedGodsCurrentIndex() +
+                count <=
+                GenesisSupply(genesisSupplyAddress).RESERVED_GODS_MAX_SUPPLY(),
+            "Not enough reserved gods left"
+        );
+        uint256 startingIndex = GenesisSupply(genesisSupplyAddress)
+            .reservedGodsCurrentIndex();
+        GenesisSupply(genesisSupplyAddress).mintReservedGods(count);
+        // We use the current index if the reserved is done in multiple parts
+        for (uint256 i = startingIndex; i < count + startingIndex; i++) {
+            _mint(msg.sender, i);
+            emit Minted(i);
+        }
+    }
 
     /**
      * Will request a random number from Chainlink to be stored privately in the contract

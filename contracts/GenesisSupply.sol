@@ -1,5 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -72,14 +73,11 @@ contract GenesisSupply is AccessControl {
      * Getters
      */
     /**
-     * Returns the total supply
-     * @return count count of NFTs minted so far
+     * Returns the current index to mint
+     * @return index current index of the collection
      */
-    function totalSupply() public view returns (uint256 count) {
-        return
-            godsCounter.current() +
-            demiGodsCounter.current() +
-            elementalsCounter.current();
+    function currentIndex() public view returns (uint256 index) {
+        return tokenCounter.current();
     }
 
     function mintCount(address to)
@@ -93,16 +91,20 @@ contract GenesisSupply is AccessControl {
 
     /**
      * Returns the number of reserved gods left
-     * @return count the amount of reserved gods left
+     * @return index current index of reserved gods
      */
-    function reservedGodsSupply()
+    function reservedGodsCurrentIndex()
         public
         view
         onlyRole(GENESIS_ROLE)
-        returns (uint256 count)
+        returns (uint256 index)
     {
-        return RESERVED_GODS_MAX_SUPPLY - reservedGodsTransfered.current();
+        return reservedGodsTransfered.current();
     }
+
+    /**
+     * Minting functions
+     */
 
     /**
      * Mint a god
@@ -162,6 +164,7 @@ contract GenesisSupply is AccessControl {
         uint256 randomNumber = generateRandomNumber(seed, tokenId);
         tokenCounter.increment();
         addressToMintCount[to]++; // we use ++ directly because it's never gonna overflow, because amount of mints are limited
+        // TODO Modify this to generate the token type at a later time
         TokenType tokenType = getTokenType(randomNumber);
         if (tokenType == TokenType.GOD) {
             mintGod(tokenId);
@@ -172,6 +175,25 @@ contract GenesisSupply is AccessControl {
         }
         return tokenId;
     }
+
+    /**
+     * Mint reserved gods
+     * This function needs to be ran BEFORE the mint is opened to avoid
+     * @param count number of gods to transfer
+     */
+    function mintReservedGods(uint256 count) public onlyRole(GENESIS_ROLE) {
+        uint256 nextIndex = reservedGodsCurrentIndex();
+        // Here we don't need to increment counter and god supply counter because we already do in the constructor
+        // to not initialize the counters at 0
+        for (uint256 i = nextIndex; i < count + nextIndex; i++) {
+            reservedGodsTransfered.increment();
+            tokenIdToTraits[i] = TokenTraits(TokenType.GOD);
+        }
+    }
+
+    /**
+     * Metadata functions
+     */
 
     /**
      * @dev Generates a uint256 random number from seed, nonce and transaction block
@@ -236,6 +258,10 @@ contract GenesisSupply is AccessControl {
         }
         revert("Not revealed yet");
     }
+
+    /**
+     *  Modifiers
+     */
 
     /**
      * Modifier that checks for a valid tokenId
