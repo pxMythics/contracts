@@ -5,6 +5,7 @@ import { Deployment } from 'hardhat-deploy/dist/types';
 import { Genesis, GenesisSupply } from '../typechain';
 import { generateMerkleTree } from './merkle-tree-utils';
 import {
+  addressZero,
   createRandomWallets,
   deployTestContract,
   generateSeed,
@@ -61,8 +62,8 @@ describe('Genesis full minting function', function () {
     const multipleFreeMintReceipt = await multipleFreeMintTx.wait();
     let freeMintIndex = 0;
     for (const event of multipleFreeMintReceipt.events || []) {
-      if (event.event === 'Minted') {
-        expect(event.args![0].toNumber()).to.equal(freeMintIndex);
+      if (event.event === 'Transfer') {
+        expect(event.args![2].toNumber()).to.equal(freeMintIndex);
         freeMintIndex++;
       }
     }
@@ -76,8 +77,8 @@ describe('Genesis full minting function', function () {
       // 10 reserved, i * 2 because each free mint has 2.
       let freeMintIndex = 10 + i * 2;
       for (const event of multipleFreeMintReceipt.events || []) {
-        if (event.event === 'Minted') {
-          expect(event.args![0].toNumber()).to.equal(freeMintIndex);
+        if (event.event === 'Transfer') {
+          expect(event.args![2].toNumber()).to.equal(freeMintIndex);
           freeMintIndex++;
         }
       }
@@ -96,9 +97,9 @@ describe('Genesis full minting function', function () {
             },
           ),
       )
-        .to.emit(contract, 'Minted')
+        .to.emit(contract, 'Transfer')
         // 10 reserved, 20 free mints
-        .withArgs(i + 30);
+        .withArgs(addressZero, minterWallets[i].address, i + 30);
     }
 
     console.log('Randomizing collection...');
