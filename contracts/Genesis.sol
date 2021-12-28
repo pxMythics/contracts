@@ -5,25 +5,13 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
-import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "./GenesisSupply.sol";
 import "hardhat/console.sol";
 
-contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
+contract Genesis is ERC721Pausable, Ownable {
     using SafeMath for uint256;
     using Counters for Counters.Counter;
-
-    /**
-     * Chainlink VRF
-     */
-    bytes32 internal keyHash;
-    uint256 internal fee;
-    uint256 private seed;
-    bytes32 private randomizationRequestId;
-    event RequestedRandomNumber(bytes32 indexed requestId);
-    event Minted(uint256 tokenId);
-    event SeedGenerated(bool generated);
 
     /**
      * Mint parameters
@@ -33,25 +21,21 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     uint256 public constant WHITELIST_MINT_COUNT = 1;
     string public unrevealedURI;
     string public baseTokenURI;
-
-    address genesisSupplyAddress;
+    mapping(address => uint256) private addressToMaxFreeMintCount;
 
     /**
      * Merkle tree properties
      */
     bytes32 private whiteListMerkleTreeRoot;
-    bytes32 private freeMintMerkleTreeRoot;
 
-    constructor(
-        address _genesisSupplyAddress,
-        address vrfCoordinator,
-        address linkToken,
-        bytes32 _keyhash,
-        string memory _unrevealedURI
-    ) VRFConsumerBase(vrfCoordinator, linkToken) ERC721("Mythical Sega", "MS") {
+    address genesisSupplyAddress;
+
+    event Minted(uint256 tokenId);
+
+    constructor(address _genesisSupplyAddress, string memory _unrevealedURI)
+        ERC721("Mythical Sega", "MS")
+    {
         genesisSupplyAddress = _genesisSupplyAddress;
-        keyHash = _keyhash;
-        fee = 0.1 * 10**18; // 0.1 LINK
         unrevealedURI = _unrevealedURI;
         _pause();
     }
@@ -81,13 +65,6 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         onlyOwner
     {
         whiteListMerkleTreeRoot = _whiteListMerkleTreeRoot;
-    }
-
-    function setFreeMintMerkleTreeRoot(bytes32 _freeMintMerkleTreeRoot)
-        external
-        onlyOwner
-    {
-        freeMintMerkleTreeRoot = _freeMintMerkleTreeRoot;
     }
 
     function setUnrevealedURI(string memory _unrevealedUri) external onlyOwner {
@@ -124,26 +101,21 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
     /**
      * Free mint
      * @param count number of tokens to mint
-     * @param maxMintCount maximum number of tokens the user can mint. Also used as a nonce to validate the proof.
-     * @param proof Proof to verify that the caller is allowed to mint
      */
-    function freeMint(
-        uint256 count,
-        uint256 maxMintCount,
-        bytes32[] calldata proof
-    ) external whenNotPaused seedGenerated onlyFreeMint(maxMintCount, proof) {
-        uint256 mintCount = GenesisSupply(genesisSupplyAddress).mintCount(
-            msg.sender
-        ) + count;
-        require(mintCount <= maxMintCount, "Trying to mint more than allowed");
+    function freeMint(uint256 count) external whenNotPaused {
+        require(
+            addressToMaxFreeMintCount[msg.sender] > 0,
+            "Address is not in the free mint list"
+        );
+        uint256 mintCount = balanceOf(msg.sender) + count;
+        require(
+            mintCount <= addressToMaxFreeMintCount[msg.sender],
+            "Trying to mint more than allowed"
+        );
         uint256 tokenId;
         for (uint256 i = 0; i < count; i++) {
-            tokenId = GenesisSupply(genesisSupplyAddress).mint(
-                msg.sender,
-                seed
-            );
+            tokenId = GenesisSupply(genesisSupplyAddress).mint();
             _mint(msg.sender, tokenId);
-            emit Minted(tokenId);
         }
     }
 
@@ -156,20 +128,16 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         external
         payable
         whenNotPaused
-        seedGenerated
-        onlyWhitelist(nonce, proof)
     {
+        require(
+            verifyProof(nonce, whiteListMerkleTreeRoot, proof),
+            "Address is not in the whitelist"
+        );
         require(msg.value >= PRICE, "Not enough ETH");
-        uint256 mintCount = GenesisSupply(genesisSupplyAddress).mintCount(
-            msg.sender
-        );
+        uint256 mintCount = balanceOf(msg.sender);
         require(mintCount < WHITELIST_MINT_COUNT, "Already minted");
-        uint256 tokenId = GenesisSupply(genesisSupplyAddress).mint(
-            msg.sender,
-            seed
-        );
+        uint256 tokenId = GenesisSupply(genesisSupplyAddress).mint();
         _mint(msg.sender, tokenId);
-        emit Minted(tokenId);
     }
 
     /**
@@ -191,32 +159,17 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         // We use the current index if the reserved is done in multiple parts
         for (uint256 i = startingIndex; i < count + startingIndex; i++) {
             _mint(msg.sender, i);
-            emit Minted(i);
         }
     }
 
     /**
-     * Will request a random number from Chainlink to be stored privately in the contract
+     * Add an address to the free mint count
+     * @param to address of free minter
+     * @param maxCount max free mint allowed for address
      */
-    function initializeRandomization() external onlyOwner {
-        require(seed == 0, "Seed already generated");
-        require(randomizationRequestId == 0, "Seed already requested");
-        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
-        randomizationRequestId = requestRandomness(keyHash, fee);
-        emit RequestedRandomNumber(randomizationRequestId);
-    }
-
-    /**
-     * Callback when a random number gets generated
-     * @param requestId id of the request sent to Chainlink
-     * @param randomNumber random number returned by Chainlink
-     */
-    function fulfillRandomness(bytes32 requestId, uint256 randomNumber)
-        internal
-        override
-    {
-        require(requestId == randomizationRequestId, "Invalid requestId");
-        seed = randomNumber;
+    function addFreeMinter(address to, uint256 maxCount) external onlyOwner {
+        require(addressToMaxFreeMintCount[to] == 0, "Already added");
+        addressToMaxFreeMintCount[to] = maxCount;
     }
 
     /**
@@ -256,39 +209,5 @@ contract Genesis is ERC721Pausable, VRFConsumerBase, Ownable {
         require(balance > 0, "No ether left to withdraw");
         (bool success, ) = (msg.sender).call{value: balance}("");
         require(success, "Transfer failed.");
-    }
-
-    /**
-     * Modifier that limits the function to whitelist members only
-     * @param nonce nonce to be used
-     * @param proof proof
-     */
-    modifier onlyWhitelist(uint256 nonce, bytes32[] memory proof) {
-        require(
-            verifyProof(nonce, whiteListMerkleTreeRoot, proof),
-            "Address is not in the whitelist"
-        );
-        _;
-    }
-
-    /**
-     * Modifier that limits the function to free mint list members only
-     * @param nonce nonce to be used
-     * @param proof proof
-     */
-    modifier onlyFreeMint(uint256 nonce, bytes32[] memory proof) {
-        require(
-            verifyProof(nonce, freeMintMerkleTreeRoot, proof),
-            "Address is not in the free mint list"
-        );
-        _;
-    }
-
-    /**
-     * Modifier to ensure that seed has been generated
-     */
-    modifier seedGenerated() {
-        require(seed > 0, "Seed not generated");
-        _;
     }
 }

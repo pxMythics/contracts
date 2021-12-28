@@ -1,15 +1,15 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { Contract, ContractReceipt, Wallet } from 'ethers';
 import { deployments, ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
-import { Contract, ContractReceipt, Wallet } from 'ethers';
-import { LinkToken } from '../typechain';
+import { Genesis, GenesisSupply, LinkToken } from '../typechain';
 import { constants } from './constants';
 
 export const deployTestContract = async (
   baseURI: string = constants.unrevealedURI,
 ): Promise<{
-  contract: Contract;
-  supplyContract: Contract;
+  contract: Genesis;
+  supplyContract: GenesisSupply;
   linkToken: Deployment;
   vrfCoordinator: Deployment;
 }> => {
@@ -52,22 +52,22 @@ export const deployTestContract = async (
 };
 /**
  *  Checks if the contract has enough $LINK and fund it otherwise
- * @param genesis The contract to fund
+ * @param contract The contract to fund
  * @param deployer The deployer of the contract
  */
 export const addLinkFundIfNeeded = async (
-  genesis: Contract,
+  contract: Contract,
   deployer: SignerWithAddress,
 ) => {
   const linkToken = await deployments.get('LinkToken');
   const LinkContract = await ethers.getContractFactory('LinkToken', deployer);
   const link = (await LinkContract.attach(linkToken.address)) as LinkToken;
 
-  const balance = await link.balanceOf(genesis.address);
+  const balance = await link.balanceOf(contract.address);
   if (balance.lte(0)) {
-    console.log('Will add funds to genesis');
+    console.log('Will add funds to contract');
     const receipt = await link.transfer(
-      genesis.address,
+      contract.address,
       '1000000000000000000000000000000',
     );
     await receipt.wait();
@@ -77,42 +77,6 @@ export const addLinkFundIfNeeded = async (
 
 export const addressZero = (): string =>
   '0x0000000000000000000000000000000000000000';
-
-/**
- * Setup randomization for minting, this needs to be done before the minting process else it will fail
- * @param owner Owner of the contract
- * @param contract The Genesis contract
- * @param oracle The oracle
- * @param coordinatorMockAddress The coordinator mock address
- * @param randomNumber Random number to be used, random if not set
- */
-export const setupRandomization = async (
-  owner: SignerWithAddress,
-  contract: Contract,
-  oracle: SignerWithAddress,
-  coordinatorMockAddress: string,
-  randomNumber: number = Math.floor(Math.random() * 100000),
-) => {
-  const randomizationTx = await contract
-    .connect(owner)
-    .initializeRandomization();
-  const randomizationReceipt: ContractReceipt = await randomizationTx.wait();
-  const requestId = randomizationReceipt.events?.find(
-    (x: any) => x.event === 'RequestedRandomNumber',
-  )?.args![0];
-
-  const vrfCoordinatorMock = await ethers.getContractAt(
-    'VRFCoordinatorMock',
-    coordinatorMockAddress,
-    oracle,
-  );
-
-  await vrfCoordinatorMock.callBackWithRandomness(
-    requestId,
-    randomNumber,
-    contract.address,
-  );
-};
 
 export const createRandomWallet = async (
   funder: SignerWithAddress,
@@ -139,4 +103,54 @@ export const createRandomWallets = async (
     wallets.push(await createRandomWallet(funder));
   }
   return wallets;
+};
+
+/**
+ * Fully mint the contract using free mints and reserved
+ * @param contract The contract to mint
+ * @param owner Owner of contract
+ * @param freeMinter Signer that will free mint
+ */
+export const fullMint = async (
+  contract: Genesis,
+  owner: SignerWithAddress,
+  freeMinter: SignerWithAddress,
+) => {
+  // Add a free minter that can mint everything
+  await contract.connect(owner).addFreeMinter(freeMinter.address, 990);
+  await contract.connect(owner).mintReservedGods(10);
+  await contract.connect(freeMinter).freeMint(990);
+};
+
+/**
+ * Generate the seed for the supply contract
+ * @param supplyContract The supply contract
+ * @param owner Owner of the contract
+ * @param oracle The oracle for the VRFCoordinator
+ * @param coordinatorMockAddress Mock address
+ * @param randomNumber Random number to use
+ */
+export const generateSeed = async (
+  supplyContract: GenesisSupply,
+  owner: SignerWithAddress,
+  oracle: SignerWithAddress,
+  coordinatorMockAddress: string,
+  randomNumber: number = Math.floor(Math.random() * 100000),
+) => {
+  const randomizationTx = await supplyContract.connect(owner).generateSeed();
+  const randomizationReceipt: ContractReceipt = await randomizationTx.wait();
+  const requestId = randomizationReceipt.events?.find(
+    (x: any) => x.event === 'RequestedRandomNumber',
+  )?.args![0];
+  const vrfCoordinatorMock = await ethers.getContractAt(
+    'VRFCoordinatorMock',
+    coordinatorMockAddress,
+    oracle,
+  );
+
+  await vrfCoordinatorMock.callBackWithRandomness(
+    requestId,
+    randomNumber,
+    supplyContract.address,
+  );
 };
