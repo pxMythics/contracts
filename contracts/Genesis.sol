@@ -112,10 +112,13 @@ contract Genesis is ERC721Pausable, Ownable {
             mintCount <= addressToMaxFreeMintCount[msg.sender],
             "Trying to mint more than allowed"
         );
-        uint256 tokenId;
-        for (uint256 i = 0; i < count; i++) {
-            tokenId = GenesisSupply(genesisSupplyAddress).mint();
-            _mint(msg.sender, tokenId);
+
+        (uint256 startIndex, uint256 endIndex) = GenesisSupply(
+            genesisSupplyAddress
+        ).mint(count);
+
+        for (uint256 i = startIndex; i < endIndex; i++) {
+            _mint(msg.sender, i);
         }
     }
 
@@ -136,8 +139,8 @@ contract Genesis is ERC721Pausable, Ownable {
         require(msg.value >= PRICE, "Not enough ETH");
         uint256 mintCount = balanceOf(msg.sender);
         require(mintCount < WHITELIST_MINT_COUNT, "Already minted");
-        uint256 tokenId = GenesisSupply(genesisSupplyAddress).mint();
-        _mint(msg.sender, tokenId);
+        (uint256 startIndex, ) = GenesisSupply(genesisSupplyAddress).mint(1);
+        _mint(msg.sender, startIndex);
     }
 
     /**
@@ -147,14 +150,13 @@ contract Genesis is ERC721Pausable, Ownable {
      * @param count number of gods to mint from the reserved pool
      */
     function mintReservedGods(uint256 count) external onlyOwner {
+        (uint256 startingIndex, uint256 maxSupply) = GenesisSupply(
+            genesisSupplyAddress
+        ).reservedGodsCurrentIndexAndSupply();
         require(
-            GenesisSupply(genesisSupplyAddress).reservedGodsCurrentIndex() +
-                count <=
-                GenesisSupply(genesisSupplyAddress).RESERVED_GODS_MAX_SUPPLY(),
+            startingIndex + count <= maxSupply,
             "Not enough reserved gods left"
         );
-        uint256 startingIndex = GenesisSupply(genesisSupplyAddress)
-            .reservedGodsCurrentIndex();
         GenesisSupply(genesisSupplyAddress).mintReservedGods(count);
         // We use the current index if the reserved is done in multiple parts
         for (uint256 i = startingIndex; i < count + startingIndex; i++) {

@@ -49,10 +49,15 @@ describe('Genesis full minting function', function () {
     console.log('Random wallets generated');
     console.log('Starting the mint process...');
     await contract.connect(owner).setWhiteListMerkleTreeRoot(treeRoot);
-    await Promise.all(
-      freeMinterWallets.map(async (wallet) => {
-        await contract.connect(owner).addFreeMinter(wallet.address, 2);
-      }),
+    for (const wallet in freeMinterWallets) {
+      await contract.connect(owner).addFreeMinter(wallet.address, 2);
+    }
+
+    await generateSeed(
+      supplyContract,
+      owner,
+      oracle,
+      VRFCoordinatorMock.address,
     );
 
     console.log('Minting reserve...');
@@ -101,17 +106,6 @@ describe('Genesis full minting function', function () {
         // 10 reserved, 20 free mints
         .withArgs(addressZero, minterWallets[i].address, i + 30);
     }
-
-    console.log('Randomizing collection...');
-    await generateSeed(
-      supplyContract,
-      owner,
-      oracle,
-      VRFCoordinatorMock.address,
-    );
-    await expect(
-      supplyContract.connect(owner).generateCollectionTraits(),
-    ).to.emit(supplyContract, 'CollectionRandomized');
 
     console.log('Minting over the limit...');
     await expect(

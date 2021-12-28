@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-expressions */
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { expect } from 'chai';
-import { Contract, utils } from 'ethers';
+import { utils } from 'ethers';
 import { Logger } from 'ethers/lib/utils';
 import { ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
@@ -139,7 +139,33 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         ).to.be.revertedWith('Address is not in the whitelist');
       });
 
+      it('Should not allow minting if seed is not generated', async function () {
+        await contract
+          .connect(owner)
+          .setWhiteListMerkleTreeRoot(whiteListMerkleTreeRoot);
+
+        await expect(
+          contract
+            .connect(whitelisted)
+            .mintWhitelist(whiteListNonce, whiteListProof, {
+              value: ethers.utils.parseEther('0.0000001'),
+            }),
+        ).to.be.revertedWith('Seed not generated');
+
+        // Free mint
+        await contract.connect(owner).addFreeMinter(freeMintListed.address, 4);
+        await expect(
+          contract.connect(freeMintListed).freeMint(4),
+        ).to.be.revertedWith('Seed not generated');
+      });
+
       it('Cannot mint more than the max mint per account', async function () {
+        await generateSeed(
+          supplyContract,
+          owner,
+          oracle,
+          VRFCoordinatorMock.address,
+        );
         // first mint
         await contract
           .connect(whitelisted)
@@ -179,6 +205,13 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       it('A user on the free mint list cannot mint more than the maximum amount allowed', async function () {
         await contract.connect(owner).addFreeMinter(freeMintListed.address, 4);
 
+        await generateSeed(
+          supplyContract,
+          owner,
+          oracle,
+          VRFCoordinatorMock.address,
+        );
+
         // More than max count
         await expect(
           contract.connect(freeMintListed).freeMint(6),
@@ -193,38 +226,34 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       });
 
       it('Owner cannot mint more than the reserved gods', async function () {
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        let returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
         // try to mint more reserved gods that are left
         await expect(
           contract.connect(owner).mintReservedGods(20),
         ).to.be.revertedWith('Not enough reserved gods left');
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
       });
 
       it('Owner cannot mint 0 the reserved gods', async function () {
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        let returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
         // try to mint more reserved gods that are left
         await expect(contract.connect(owner).mintReservedGods(0)).to.not.emit(
           contract,
           'Transfer',
         );
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
       });
     });
 
@@ -235,6 +264,12 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           .connect(owner)
           .setWhiteListMerkleTreeRoot(whiteListMerkleTreeRoot);
         await contract.connect(owner).addFreeMinter(freeMintListed.address, 2);
+        await generateSeed(
+          supplyContract,
+          owner,
+          oracle,
+          VRFCoordinatorMock.address,
+        );
       });
 
       it('A user on the whitelist can mint with a valid nonce and proof', async function () {
@@ -282,11 +317,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       });
 
       it('Mint the 10 reserved gods (single transaction)', async function () {
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        let returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
         const multipleFreeMintTx = await contract
           .connect(owner)
           .mintReservedGods(10);
@@ -298,11 +332,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
             freeMintIndex++;
           }
         }
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(10);
+        returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(10);
 
         expect(await contract.balanceOf(owner.address)).to.equal(10);
         await expect(
@@ -311,11 +344,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       });
 
       it('Mint the 10 reserved gods (multiple transaction)', async function () {
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        let returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
         let multipleFreeMintTx = await contract
           .connect(owner)
           .mintReservedGods(3);
@@ -327,11 +359,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
             freeMintIndex++;
           }
         }
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(3);
+        returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(3);
 
         expect(await contract.balanceOf(owner.address)).to.equal(3);
 
@@ -344,11 +375,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           }
         }
 
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(10);
+        returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(10);
 
         expect(await contract.balanceOf(owner.address)).to.equal(10);
         await expect(
@@ -378,40 +408,46 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
   describe('GenesisSupplyContract', () => {
     it('Should initialize the GenesisSupply contract', async () => {
       expect(await supplyContract.MAX_SUPPLY()).to.equal(1000);
+      const returnValue = await supplyContract
+        .connect(contract.address)
+        .reservedGodsCurrentIndexAndSupply();
+      expect(returnValue[0]).to.equal(0);
+      expect(returnValue[1]).to.equal(10);
     });
 
     it('Only the Genesis can access the reservedGodsCurrentIndex', async () => {
       await expect(
-        supplyContract.connect(whitelisted).reservedGodsCurrentIndex(),
+        supplyContract.connect(whitelisted).reservedGodsCurrentIndexAndSupply(),
       ).to.be.revertedWith(
         `AccessControl: account ${whitelisted.address.toLowerCase()} is missing role ${
           constants.genesisRole
         }`,
       );
       await expect(
-        supplyContract.connect(freeMintListed).reservedGodsCurrentIndex(),
+        supplyContract
+          .connect(freeMintListed)
+          .reservedGodsCurrentIndexAndSupply(),
       ).to.be.revertedWith(
         `AccessControl: account ${freeMintListed.address.toLowerCase()} is missing role ${
           constants.genesisRole
         }`,
       );
-      expect(
-        await supplyContract
-          .connect(contract.address)
-          .reservedGodsCurrentIndex(),
-      ).to.equal(0);
+      const returnValue = await supplyContract
+        .connect(contract.address)
+        .reservedGodsCurrentIndexAndSupply();
+      expect(returnValue[0]).to.equal(0);
     });
 
     it('Only the Genesis can access the mint. ONLY FOR TESTING, SHOULD NOT BE DONE MANUALLY', async () => {
       await expect(
-        supplyContract.connect(whitelisted).mint(),
+        supplyContract.connect(whitelisted).mint(1),
       ).to.be.revertedWith(
         `AccessControl: account ${whitelisted.address.toLowerCase()} is missing role ${
           constants.genesisRole
         }`,
       );
       await expect(
-        supplyContract.connect(freeMintListed).mint(),
+        supplyContract.connect(freeMintListed).mint(1),
       ).to.be.revertedWith(
         `AccessControl: account ${freeMintListed.address.toLowerCase()} is missing role ${
           constants.genesisRole
@@ -421,17 +457,6 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
 
     it('Backend has access to metadata before reveal date', async () => {
       await contract.connect(owner).unpause();
-      await fullMint(contract, owner, freeMintListed);
-      await generateSeed(
-        supplyContract,
-        owner,
-        oracle,
-        VRFCoordinatorMock.address,
-      );
-      await expect(
-        supplyContract.connect(owner).generateCollectionTraits(),
-      ).to.emit(supplyContract, 'CollectionRandomized');
-
       await expect(
         supplyContract.connect(backend.address).getMetadataForTokenId(1),
       ).to.be.revertedWith('Not revealed yet');
@@ -447,33 +472,8 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       expect(metadata).to.be.equal(metadata);
     });
 
-    it('Should not be able to randomize collection if not all reserve is minted', async () => {
+    it('Should not be able to generate seed twice', async () => {
       await contract.connect(owner).unpause();
-      await expect(
-        supplyContract.connect(owner).generateSeed(),
-      ).to.be.revertedWith('Not all reserve minted');
-      await contract.connect(owner).mintReservedGods(7);
-      await expect(
-        supplyContract.connect(owner).generateSeed(),
-      ).to.be.revertedWith('Not all reserve minted');
-    });
-
-    it('Should not be able to randomize collection if not all tokens are minted', async () => {
-      await contract.connect(owner).unpause();
-      await contract.connect(owner).addFreeMinter(freeMintListed.address, 2);
-      await contract.connect(owner).mintReservedGods(10);
-      await expect(
-        supplyContract.connect(owner).generateSeed(),
-      ).to.be.revertedWith('Not all minted');
-      await contract.connect(freeMintListed).freeMint(2);
-      await expect(
-        supplyContract.connect(owner).generateSeed(),
-      ).to.be.revertedWith('Not all minted');
-    });
-
-    it('Should not be able to randomize collection twice', async () => {
-      await contract.connect(owner).unpause();
-      await fullMint(contract, owner, freeMintListed);
       await generateSeed(
         supplyContract,
         owner,
@@ -488,40 +488,14 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
 
     it('Should not be able to randomize collection twice before ChainLink callback', async () => {
       await contract.connect(owner).unpause();
-      await fullMint(contract, owner, freeMintListed);
       await supplyContract.connect(owner).generateSeed();
       await expect(
         supplyContract.connect(owner).generateSeed(),
       ).to.be.revertedWith('Randomization already started');
     });
 
-    it('Metadata is not available until before the collection is randomized', async function () {
-      await contract.connect(owner).unpause();
-      await fullMint(contract, owner, freeMintListed);
-      await generateSeed(
-        supplyContract,
-        owner,
-        oracle,
-        VRFCoordinatorMock.address,
-      );
-      await expect(
-        supplyContract.connect(contract.address).getMetadataForTokenId(1),
-      ).to.be.revertedWith('Collection not randomized');
-    });
-
     it('Metadata is not available until before the collection is revealed', async function () {
       await contract.connect(owner).unpause();
-      await fullMint(contract, owner, freeMintListed);
-      await generateSeed(
-        supplyContract,
-        owner,
-        oracle,
-        VRFCoordinatorMock.address,
-      );
-      await expect(
-        supplyContract.connect(owner).generateCollectionTraits(),
-      ).to.emit(supplyContract, 'CollectionRandomized');
-
       await expect(
         supplyContract.connect(contract.address).getMetadataForTokenId(1),
       ).to.be.revertedWith('Not revealed yet');
@@ -530,17 +504,6 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
     it('No metadata is returned if trying to access an invalid token id', async function () {
       await contract.connect(owner).unpause();
       await contract.connect(owner).setBaseURI(constants.revealedURI);
-      await fullMint(contract, owner, freeMintListed);
-      await generateSeed(
-        supplyContract,
-        owner,
-        oracle,
-        VRFCoordinatorMock.address,
-      );
-
-      await expect(
-        supplyContract.connect(owner).generateCollectionTraits(),
-      ).to.emit(supplyContract, 'CollectionRandomized');
       await expect(
         supplyContract.connect(contract.address).getMetadataForTokenId(0),
       ).to.be.revertedWith('Invalid tokenId');
@@ -555,7 +518,6 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
     it('Metadata is returned if trying to access a valid token id and collection is revealed', async function () {
       await contract.connect(owner).unpause();
       await contract.connect(owner).setBaseURI(constants.revealedURI);
-      await fullMint(contract, owner, freeMintListed);
       await generateSeed(
         supplyContract,
         owner,
@@ -563,14 +525,14 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         VRFCoordinatorMock.address,
       );
 
-      await expect(
-        supplyContract.connect(owner).generateCollectionTraits(),
-      ).to.emit(supplyContract, 'CollectionRandomized');
+      // Mint 50, we should expect one to not be a god (there's 50 gods and 10 are reserved)
+      await contract.connect(owner).addFreeMinter(freeMintListed.address, 50);
+      await contract.connect(freeMintListed).freeMint(50);
 
       // Metadata for token 0-9 are all Gods, since 0 is default value, we test over 9
       let foundNonGodMetadata = false;
-      let i = 9;
-      let metadata;
+      let i = 10;
+      let metadata: [number] & { tokenType: number };
       while (!foundNonGodMetadata) {
         metadata = await supplyContract.getMetadataForTokenId(i);
         console.log(
@@ -579,7 +541,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         foundNonGodMetadata = metadata[0] > 0;
         i++;
       }
-      expect(metadata[i]).to.not.be.equal(0);
+      expect(metadata![0]).to.not.be.equal(0);
     });
   });
 });
