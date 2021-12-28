@@ -443,14 +443,14 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
 
     it('Only the Genesis can access the mint. ONLY FOR TESTING, SHOULD NOT BE DONE MANUALLY', async () => {
       await expect(
-        supplyContract.connect(whitelisted).mint(),
+        supplyContract.connect(whitelisted).mint(1),
       ).to.be.revertedWith(
         `AccessControl: account ${whitelisted.address.toLowerCase()} is missing role ${
           constants.genesisRole
         }`,
       );
       await expect(
-        supplyContract.connect(freeMintListed).mint(),
+        supplyContract.connect(freeMintListed).mint(1),
       ).to.be.revertedWith(
         `AccessControl: account ${freeMintListed.address.toLowerCase()} is missing role ${
           constants.genesisRole

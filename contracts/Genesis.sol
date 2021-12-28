@@ -112,10 +112,13 @@ contract Genesis is ERC721Pausable, Ownable {
             mintCount <= addressToMaxFreeMintCount[msg.sender],
             "Trying to mint more than allowed"
         );
-        uint256 tokenId;
-        for (uint256 i = 0; i < count; i++) {
-            tokenId = GenesisSupply(genesisSupplyAddress).mint();
-            _mint(msg.sender, tokenId);
+
+        (uint256 startIndex, uint256 endIndex) = GenesisSupply(
+            genesisSupplyAddress
+        ).mint(count);
+
+        for (uint256 i = startIndex; i < endIndex; i++) {
+            _mint(msg.sender, i);
         }
     }
 
@@ -136,8 +139,8 @@ contract Genesis is ERC721Pausable, Ownable {
         require(msg.value >= PRICE, "Not enough ETH");
         uint256 mintCount = balanceOf(msg.sender);
         require(mintCount < WHITELIST_MINT_COUNT, "Already minted");
-        uint256 tokenId = GenesisSupply(genesisSupplyAddress).mint();
-        _mint(msg.sender, tokenId);
+        (uint256 startIndex, ) = GenesisSupply(genesisSupplyAddress).mint(1);
+        _mint(msg.sender, startIndex);
     }
 
     /**

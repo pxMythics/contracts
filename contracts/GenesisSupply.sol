@@ -119,20 +119,26 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     /**
      * Mint a token
      */
-    function mint()
+    function mint(uint256 count)
         public
         onlyRole(GENESIS_ROLE)
         seedGenerated
-        returns (uint256)
+        returns (uint256 startIndex, uint256 endIndex)
     {
-        require(tokenCounter.current() < MAX_SUPPLY, "Not enough supply");
-        uint256 tokenId = tokenCounter.current();
-        tokenIdToTraits[tokenId] = TokenTraits(
-            generateTokenType(generateRandomNumber(tokenId))
+        require(
+            tokenCounter.current() + count < MAX_SUPPLY,
+            "Not enough supply"
         );
-        tokenCounter.increment();
-        emit Minted(tokenId);
-        return tokenId;
+        uint256 firstTokenId = tokenCounter.current();
+        for (uint256 i = 0; i < count; i++) {
+            uint256 nextTokenId = firstTokenId + i;
+            tokenIdToTraits[nextTokenId] = TokenTraits(
+                generateTokenType(generateRandomNumber(nextTokenId))
+            );
+            emit Minted(nextTokenId);
+            tokenCounter.increment();
+        }
+        return (firstTokenId, firstTokenId + count);
     }
 
     /**
