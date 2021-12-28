@@ -15,22 +15,27 @@ const deployGenesis: DeployFunction = async function (
   const deployerSigner = await ethers.getSigner(deployer);
   const chainId = await getChainId();
 
-  console.log(`Deploying Genesis on ${chainId}`);
-
   const linkToken = await get('LinkToken');
   const VRFCoordinatorMock = await get('VRFCoordinatorMock');
   const linkTokenAddress = linkToken.address;
   const vrfCoordinatorAddress = VRFCoordinatorMock.address;
   const keyHash: string = networkConfig[chainId].keyHash;
 
+  console.log(`Deploying GenesisSupply on ${chainId}`);
+  const genesisSupply = await deploy('GenesisSupply', {
+    from: deployer,
+    args: [vrfCoordinatorAddress, linkTokenAddress, keyHash],
+    log: true,
+  });
+  await hre.ethernal.push({
+    name: 'GenesisSupply',
+    address: genesisSupply.address,
+  });
+
+  console.log(`Deploying Genesis on ${chainId}`);
   const genesis = await deploy('Genesis', {
     from: deployer,
-    args: [
-      vrfCoordinatorAddress,
-      linkTokenAddress,
-      keyHash,
-      'ipfs://QmUygfragP8UmCa7aq19AHLttxiLw1ELnqcsQQpM5crgTF/',
-    ],
+    args: [genesisSupply.address, constants.unrevealedURI],
     log: true,
   });
   await hre.ethernal.push({
@@ -44,13 +49,13 @@ const deployGenesis: DeployFunction = async function (
 
   const link = (await LinkContract.attach(linkToken.address)) as LinkToken;
   const receipt = await link.transfer(
-    genesis.address,
+    genesisSupply.address,
     '10000000000000000000000000',
   );
   await receipt.wait();
-  console.log(`Genesis (${genesis.address}) funded with LINK`);
-  const balance = await link.balanceOf(genesis.address);
-  console.log(`Genesis LINK balance: ${balance}`);
+  console.log(`Genesis supply (${genesisSupply.address}) funded with LINK`);
+  const balance = await link.balanceOf(genesisSupply.address);
+  console.log(`Genesis supply LINK balance: ${balance}`);
 };
 export default deployGenesis;
 deployGenesis.tags = ['all', 'genesis'];
