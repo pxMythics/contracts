@@ -100,16 +100,17 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     }
 
     /**
-     * Returns the number of reserved gods left
+     * Returns the number of reserved gods left with the supply
      * @return index current index of reserved gods
+     * @return supply max supply of reserved gods
      */
-    function reservedGodsCurrentIndex()
+    function reservedGodsCurrentIndexAndSupply()
         public
         view
         onlyRole(GENESIS_ROLE)
-        returns (uint256 index)
+        returns (uint256 index, uint256 supply)
     {
-        return reservedGodsTransfered.current();
+        return (reservedGodsTransfered.current(), RESERVED_GODS_MAX_SUPPLY);
     }
 
     /**
@@ -118,6 +119,9 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
 
     /**
      * Mint a token
+     * @param count the number of item to mint
+     * @return startIndex index of first mint
+     * @return endIndex index of last mint
      */
     function mint(uint256 count)
         public
@@ -147,7 +151,7 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
      * @param count number of gods to transfer
      */
     function mintReservedGods(uint256 count) public onlyRole(GENESIS_ROLE) {
-        uint256 nextIndex = reservedGodsCurrentIndex();
+        uint256 nextIndex = reservedGodsTransfered.current();
         // Here we don't need to increment counter and god supply counter because we already do in the constructor
         // to not initialize the counters at 0
         for (uint256 i = nextIndex; i < count + nextIndex; i++) {

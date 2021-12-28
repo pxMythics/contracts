@@ -150,14 +150,13 @@ contract Genesis is ERC721Pausable, Ownable {
      * @param count number of gods to mint from the reserved pool
      */
     function mintReservedGods(uint256 count) external onlyOwner {
+        (uint256 startingIndex, uint256 maxSupply) = GenesisSupply(
+            genesisSupplyAddress
+        ).reservedGodsCurrentIndexAndSupply();
         require(
-            GenesisSupply(genesisSupplyAddress).reservedGodsCurrentIndex() +
-                count <=
-                GenesisSupply(genesisSupplyAddress).RESERVED_GODS_MAX_SUPPLY(),
+            startingIndex + count <= maxSupply,
             "Not enough reserved gods left"
         );
-        uint256 startingIndex = GenesisSupply(genesisSupplyAddress)
-            .reservedGodsCurrentIndex();
         GenesisSupply(genesisSupplyAddress).mintReservedGods(count);
         // We use the current index if the reserved is done in multiple parts
         for (uint256 i = startingIndex; i < count + startingIndex; i++) {

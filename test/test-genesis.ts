@@ -226,38 +226,34 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       });
 
       it('Owner cannot mint more than the reserved gods', async function () {
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        let returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
         // try to mint more reserved gods that are left
         await expect(
           contract.connect(owner).mintReservedGods(20),
         ).to.be.revertedWith('Not enough reserved gods left');
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
       });
 
       it('Owner cannot mint 0 the reserved gods', async function () {
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        let returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
         // try to mint more reserved gods that are left
         await expect(contract.connect(owner).mintReservedGods(0)).to.not.emit(
           contract,
           'Transfer',
         );
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
       });
     });
 
@@ -321,11 +317,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       });
 
       it('Mint the 10 reserved gods (single transaction)', async function () {
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        let returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
         const multipleFreeMintTx = await contract
           .connect(owner)
           .mintReservedGods(10);
@@ -337,11 +332,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
             freeMintIndex++;
           }
         }
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(10);
+        returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(10);
 
         expect(await contract.balanceOf(owner.address)).to.equal(10);
         await expect(
@@ -350,11 +344,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       });
 
       it('Mint the 10 reserved gods (multiple transaction)', async function () {
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(0);
+        let returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(0);
         let multipleFreeMintTx = await contract
           .connect(owner)
           .mintReservedGods(3);
@@ -366,11 +359,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
             freeMintIndex++;
           }
         }
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(3);
+        returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(3);
 
         expect(await contract.balanceOf(owner.address)).to.equal(3);
 
@@ -383,11 +375,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           }
         }
 
-        expect(
-          await supplyContract
-            .connect(contract.address)
-            .reservedGodsCurrentIndex(),
-        ).to.equal(10);
+        returnValue = await supplyContract
+          .connect(contract.address)
+          .reservedGodsCurrentIndexAndSupply();
+        expect(returnValue[0]).to.equal(10);
 
         expect(await contract.balanceOf(owner.address)).to.equal(10);
         await expect(
@@ -417,28 +408,34 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
   describe('GenesisSupplyContract', () => {
     it('Should initialize the GenesisSupply contract', async () => {
       expect(await supplyContract.MAX_SUPPLY()).to.equal(1000);
+      const returnValue = await supplyContract
+        .connect(contract.address)
+        .reservedGodsCurrentIndexAndSupply();
+      expect(returnValue[0]).to.equal(0);
+      expect(returnValue[1]).to.equal(10);
     });
 
     it('Only the Genesis can access the reservedGodsCurrentIndex', async () => {
       await expect(
-        supplyContract.connect(whitelisted).reservedGodsCurrentIndex(),
+        supplyContract.connect(whitelisted).reservedGodsCurrentIndexAndSupply(),
       ).to.be.revertedWith(
         `AccessControl: account ${whitelisted.address.toLowerCase()} is missing role ${
           constants.genesisRole
         }`,
       );
       await expect(
-        supplyContract.connect(freeMintListed).reservedGodsCurrentIndex(),
+        supplyContract
+          .connect(freeMintListed)
+          .reservedGodsCurrentIndexAndSupply(),
       ).to.be.revertedWith(
         `AccessControl: account ${freeMintListed.address.toLowerCase()} is missing role ${
           constants.genesisRole
         }`,
       );
-      expect(
-        await supplyContract
-          .connect(contract.address)
-          .reservedGodsCurrentIndex(),
-      ).to.equal(0);
+      const returnValue = await supplyContract
+        .connect(contract.address)
+        .reservedGodsCurrentIndexAndSupply();
+      expect(returnValue[0]).to.equal(0);
     });
 
     it('Only the Genesis can access the mint. ONLY FOR TESTING, SHOULD NOT BE DONE MANUALLY', async () => {
