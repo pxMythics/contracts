@@ -1,4 +1,3 @@
-import { task } from 'hardhat/config';
 import '@typechain/hardhat';
 import '@nomiclabs/hardhat-waffle';
 import 'hardhat-gas-reporter';
@@ -10,19 +9,11 @@ import 'hardhat-ethernal';
 import 'hardhat-tracer';
 import 'hardhat-log-remover';
 import 'hardhat-contract-sizer';
+import 'hardhat-abi-exporter';
+import './tasks/mint-tasks';
 
 dotenv.config();
 const { API_URL, PRIVATE_KEY, ETHERSCAN_API_KEY, REPORT_GAS } = process.env;
-
-// This is a sample Hardhat task. To learn how to create your own go to
-// https://hardhat.org/guides/create-task.html
-task('accounts', 'Prints the list of accounts', async (_taskArgs, hre: any) => {
-  const accounts = await hre.ethers.getSigners();
-
-  for (const account of accounts) {
-    console.log(account.address);
-  }
-});
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -45,6 +36,10 @@ module.exports = {
         version: '0.4.24',
       },
     ],
+    optimizer: {
+      enabled: true,
+      runs: 200,
+    },
   },
   networks: {
     goerli: {

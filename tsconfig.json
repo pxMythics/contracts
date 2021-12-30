@@ -8,6 +8,6 @@
     "declaration": false,
     "moduleResolution": "node",
   },
-  "include": ["./scripts", "./test", "./deploy", "./typechain"],
-  "files": ["./hardhat.config.ts"]
+  "include": ["./scripts", "./test", "./deploy", "./typechain", "./tasks"],
+  "files": ["./hardhat.config.ts", "./helper-hardhat-config.ts"]
 }
