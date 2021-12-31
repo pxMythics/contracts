@@ -24,7 +24,6 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
   let whitelisted: SignerWithAddress; // 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
   let notWhitelisted: SignerWithAddress;
   let freeMintListed: SignerWithAddress; // 0x976EA74026E726554dB657fA54763abd0C3a0aa9
-  let backend: SignerWithAddress;
   const whiteListMerkleTreeRoot =
     '0xe32689cba5d4fa1698e45bcc090b47a13a1ea9c41671c5205bebeecd5b9ebb7f';
   const whiteListNonce = 0;
@@ -54,7 +53,6 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
     whitelisted = signers[2];
     notWhitelisted = signers[4];
     freeMintListed = signers[6];
-    backend = signers[8];
     const deployedContracts = await deployTestContract();
     contract = deployedContracts.contract;
     supplyContract = deployedContracts.supplyContract;
@@ -69,7 +67,9 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
   describe('Genesis Contract', () => {
     // TODO Adjust with real values
     it('Should initialize the Genesis contract', async () => {
-      expect(await contract.PRICE()).to.equal(utils.parseEther('0.0000001'));
+      expect(await contract.price()).to.equal(
+        utils.parseEther(constants.mintPrice),
+      );
       expect(await contract.WHITELIST_MINT_COUNT()).to.equal(1);
       expect(await contract.paused()).to.be.true;
     });
@@ -118,7 +118,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           contract
             .connect(whitelisted)
             .mintWhitelist(whiteListNonce, whiteListProof, {
-              value: ethers.utils.parseEther('0.000000000001'),
+              value: ethers.utils.parseEther('0.0077'),
             }),
         ).to.be.revertedWith('Not enough ETH');
       });
@@ -148,7 +148,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           contract
             .connect(whitelisted)
             .mintWhitelist(whiteListNonce, whiteListProof, {
-              value: ethers.utils.parseEther('0.0000001'),
+              value: ethers.utils.parseEther(constants.mintPrice),
             }),
         ).to.be.revertedWith('Seed not generated');
 
@@ -170,14 +170,14 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         await contract
           .connect(whitelisted)
           .mintWhitelist(whiteListNonce, whiteListProof, {
-            value: ethers.utils.parseEther('0.0000001'),
+            value: ethers.utils.parseEther(constants.mintPrice),
           });
         // second mint should fail
         await expect(
           contract
             .connect(whitelisted)
             .mintWhitelist(whiteListNonce, whiteListProof, {
-              value: ethers.utils.parseEther('0.0000001'),
+              value: ethers.utils.parseEther(constants.mintPrice),
             }),
         ).to.be.revertedWith('Already minted');
       });
@@ -281,7 +281,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           contract
             .connect(whitelisted)
             .mintWhitelist(whiteListNonce, whiteListProof, {
-              value: ethers.utils.parseEther('0.0000001'),
+              value: ethers.utils.parseEther(constants.mintPrice),
             }),
         )
           .to.emit(contract, 'Transfer')
@@ -453,23 +453,6 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           constants.genesisRole
         }`,
       );
-    });
-
-    it('Backend has access to metadata before reveal date', async () => {
-      await contract.connect(owner).unpause();
-      await expect(
-        supplyContract.connect(backend.address).getMetadataForTokenId(1),
-      ).to.be.revertedWith('Not revealed yet');
-
-      await supplyContract
-        .connect(owner)
-        .grantRole(constants.backendRole, backend.address);
-
-      // TODO Update when metadata is available
-      const metadata = await supplyContract
-        .connect(backend.address)
-        .getMetadataForTokenId(1);
-      expect(metadata).to.be.equal(metadata);
     });
 
     it('Should not be able to generate seed twice', async () => {

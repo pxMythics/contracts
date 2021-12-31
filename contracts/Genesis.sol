@@ -16,9 +16,8 @@ contract Genesis is ERC721Pausable, Ownable {
     /**
      * Mint parameters
      */
-    // TODO Adjust after testing phase
-    uint256 public constant PRICE = 0.0000001 ether;
     uint256 public constant WHITELIST_MINT_COUNT = 1;
+    uint256 public price;
     string public unrevealedURI;
     string public baseTokenURI;
     mapping(address => uint256) private addressToMaxFreeMintCount;
@@ -32,11 +31,14 @@ contract Genesis is ERC721Pausable, Ownable {
 
     event Minted(uint256 tokenId);
 
-    constructor(address _genesisSupplyAddress, string memory _unrevealedURI)
-        ERC721("Mythical Sega", "MS")
-    {
+    constructor(
+        address _genesisSupplyAddress,
+        string memory _unrevealedURI,
+        uint256 _price
+    ) ERC721("Mythical Sega", "MS") {
         genesisSupplyAddress = _genesisSupplyAddress;
         unrevealedURI = _unrevealedURI;
+        price = _price;
         _pause();
     }
 
@@ -136,7 +138,7 @@ contract Genesis is ERC721Pausable, Ownable {
             verifyProof(nonce, whiteListMerkleTreeRoot, proof),
             "Address is not in the whitelist"
         );
-        require(msg.value >= PRICE, "Not enough ETH");
+        require(msg.value >= price, "Not enough ETH");
         uint256 mintCount = balanceOf(msg.sender);
         require(mintCount < WHITELIST_MINT_COUNT, "Already minted");
         (uint256 startIndex, ) = GenesisSupply(genesisSupplyAddress).mint(1);

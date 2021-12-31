@@ -57,7 +57,6 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
      */
     bool public isRevealed;
     bytes32 public constant GENESIS_ROLE = keccak256("GENESIS_ROLE");
-    bytes32 public constant BACKEND_ROLE = keccak256("BACKEND_ROLE");
 
     event Minted(uint256 tokenId);
     event CollectionRandomized();
@@ -67,12 +66,13 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     constructor(
         address vrfCoordinator,
         address linkToken,
-        bytes32 _keyhash
+        bytes32 _keyhash,
+        uint256 _fee
     ) VRFConsumerBase(vrfCoordinator, linkToken) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         // TODO start other counters at 1 to save on gas
         keyHash = _keyhash;
-        fee = 0.1 * 10**18; // 0.1 LINK
+        fee = _fee;
         isRevealed = false;
         // reserve 10 gods for owner
         for (uint256 i = 0; i < RESERVED_GODS_MAX_SUPPLY; i++) {
@@ -245,10 +245,6 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         validTokenId(tokenId)
         returns (TokenTraits memory traits)
     {
-        // Backend has access to metadata before anyone
-        if (hasRole(BACKEND_ROLE, msg.sender)) {
-            return tokenIdToTraits[tokenId];
-        }
         require(isRevealed, "Not revealed yet");
         return tokenIdToTraits[tokenId];
     }
