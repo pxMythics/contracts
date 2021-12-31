@@ -13,7 +13,14 @@ import 'hardhat-abi-exporter';
 import './tasks/mint-tasks';
 
 dotenv.config();
-const { API_URL, PRIVATE_KEY, ETHERSCAN_API_KEY, REPORT_GAS } = process.env;
+const {
+  MAINNET_PRIVATE_KEY,
+  RINKEBY_PRIVATE_KEY,
+  MAINNET_API_URL,
+  RINKEBY_API_URL,
+  ETHERSCAN_API_KEY,
+  REPORT_GAS,
+} = process.env;
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -42,9 +49,9 @@ module.exports = {
     },
   },
   networks: {
-    goerli: {
-      url: API_URL,
-      accounts: [PRIVATE_KEY],
+    rinkeby: {
+      url: RINKEBY_API_URL,
+      accounts: [RINKEBY_PRIVATE_KEY],
     },
   },
   gasReporter: {
@@ -58,6 +65,7 @@ module.exports = {
     deployer: {
       default: 9,
       1: 9,
+      rinkeby: 0,
     },
   },
   contractSizer: {

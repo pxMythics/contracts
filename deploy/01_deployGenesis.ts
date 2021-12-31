@@ -3,7 +3,6 @@ import { DeployFunction } from 'hardhat-deploy/types';
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { networkConfig } from '../helper-hardhat-config';
 import { LinkToken } from '../typechain';
-import { constants } from '../test/constants';
 
 const deployGenesis: DeployFunction = async function (
   hre: HardhatRuntimeEnvironment,
@@ -14,12 +13,8 @@ const deployGenesis: DeployFunction = async function (
   const deployerSigner = await ethers.getSigner(deployer);
   const chainId = await getChainId();
 
-  const linkToken = await get('LinkToken');
-  const VRFCoordinatorMock = await get('VRFCoordinatorMock');
-  const linkTokenAddress =
-    networkConfig[chainId].linkToken ?? linkToken.address;
-  const vrfCoordinatorAddress =
-    networkConfig[chainId].vrfCoordinator ?? VRFCoordinatorMock.address;
+  const linkTokenAddress = networkConfig[chainId].linkToken;
+  const vrfCoordinatorAddress = networkConfig[chainId].vrfCoordinator;
   const keyHash: string = networkConfig[chainId].keyHash;
   const chainlinkFee: string = networkConfig[chainId].chainlinkFee;
   const mintPrice: string = networkConfig[chainId].mintPrice;
@@ -27,25 +22,52 @@ const deployGenesis: DeployFunction = async function (
   const openSeaProxyAddress: string =
     networkConfig[chainId].openSeaProxyAddress;
 
-  console.log(`Deploying GenesisSupply on ${chainId}`);
-  const genesisSupply = await deploy('GenesisSupply', {
-    from: deployer,
-    args: [vrfCoordinatorAddress, linkTokenAddress, keyHash, chainlinkFee],
-    log: true,
-  });
-  console.log(`Deploying Genesis on ${chainId}`);
-  const genesis = await deploy('Genesis', {
-    from: deployer,
-    args: [
-      genesisSupply.address,
-      unrevealedURI,
-      mintPrice,
-      openSeaProxyAddress,
-    ],
-    log: true,
-  });
+  if (chainId !== '31137') {
+    console.log(`Deploying GenesisSupply on ${chainId}`);
+    const genesisSupply = await deploy('GenesisSupply', {
+      from: deployer,
+      args: [vrfCoordinatorAddress, linkTokenAddress, keyHash, chainlinkFee],
+      log: true,
+    });
+    console.log(`Deploying Genesis on ${chainId}`);
+    await deploy('Genesis', {
+      from: deployer,
+      args: [
+        genesisSupply.address,
+        unrevealedURI,
+        mintPrice,
+        openSeaProxyAddress,
+      ],
+      log: true,
+    });
+  }
   // Test network deployment only
   if (chainId === '31337') {
+    const linkToken = await get('LinkToken');
+    const VRFCoordinatorMock = await get('VRFCoordinatorMock');
+    console.log(`Deploying GenesisSupply on ${chainId}`);
+    const genesisSupply = await deploy('GenesisSupply', {
+      from: deployer,
+      args: [
+        VRFCoordinatorMock.address,
+        linkToken.address,
+        keyHash,
+        chainlinkFee,
+      ],
+      log: true,
+    });
+    console.log(`Deploying Genesis on ${chainId}`);
+    const genesis = await deploy('Genesis', {
+      from: deployer,
+      args: [
+        genesisSupply.address,
+        unrevealedURI,
+        mintPrice,
+        openSeaProxyAddress,
+      ],
+      log: true,
+    });
+
     await hre.ethernal.push({
       name: 'GenesisSupply',
       address: genesisSupply.address,
