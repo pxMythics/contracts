@@ -15,10 +15,22 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         DEMI_GOD,
         ELEMENTAL
     }
+    enum TokenSubtype {
+        NONE,
+        CREATIVE,
+        DESTRUCTIVE,
+        AIR,
+        EARTH,
+        ELECTRICITY,
+        FIRE,
+        MAGMA,
+        METAL,
+        WATER
+    }
 
     struct TokenTraits {
         TokenType tokenType;
-        // TODO add other traits
+        TokenSubtype tokenSubtype;
     }
 
     /**
@@ -32,10 +44,14 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     /**
      * Supply
      */
+
     uint256 public constant MAX_SUPPLY = 1000;
     uint256 public constant GODS_MAX_SUPPLY = 50;
     uint256 public constant DEMI_GODS_MAX_SUPPLY = 400;
+    uint256 public constant DEMI_GODS_SUBTYPE_MAX_SUPPLY = 200;
     uint256 public constant ELEMENTALS_MAX_SUPPLY = 550;
+    uint256 public constant ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY = 100;
+    uint256 public constant ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY = 50;
     uint256 public constant RESERVED_GODS_MAX_SUPPLY = 10;
 
     /**
@@ -43,8 +59,15 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
      */
     Counters.Counter private tokenCounter;
     Counters.Counter private godsCounter;
-    Counters.Counter private demiGodsCounter;
-    Counters.Counter private elementalsCounter;
+    Counters.Counter private creativeDemiGodsCounter;
+    Counters.Counter private destructiveDemiGodsCounter;
+    Counters.Counter private earthElementalsCounter;
+    Counters.Counter private waterElementalsCounter;
+    Counters.Counter private fireElementalsCounter;
+    Counters.Counter private airElementalsCounter;
+    Counters.Counter private electricityElementalsCounter;
+    Counters.Counter private metalElementalsCounter;
+    Counters.Counter private magmaElementalsCounter;
     Counters.Counter private reservedGodsTransfered;
 
     /**
@@ -136,8 +159,8 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         uint256 firstTokenId = tokenCounter.current();
         for (uint256 i = 0; i < count; i++) {
             uint256 nextTokenId = firstTokenId + i;
-            tokenIdToTraits[nextTokenId] = TokenTraits(
-                generateTokenType(generateRandomNumber(nextTokenId))
+            tokenIdToTraits[nextTokenId] = generateRandomTraits(
+                generateRandomNumber(nextTokenId)
             );
             emit Minted(nextTokenId);
             tokenCounter.increment();
@@ -156,7 +179,7 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         // to not initialize the counters at 0
         for (uint256 i = nextIndex; i < count + nextIndex; i++) {
             reservedGodsTransfered.increment();
-            tokenIdToTraits[i] = TokenTraits(TokenType.GOD);
+            tokenIdToTraits[i] = TokenTraits(TokenType.GOD, TokenSubtype.NONE);
         }
     }
 
@@ -205,32 +228,133 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     }
 
     /**
-     * Generate and returns the token type (god, demi-god, or elemental) given a random number.
-     * Function will adjust supply based on the type generated
+     * Generate and returns the token traits (type & subtype) given a random number.
+     * Function will adjust supply based on the type and subtypes generated
      * @param randomNumber random number provided
-     * @return tokenType a randomly picked token type
+     * @return tokenTraits randomly picked token traits
      */
-    function generateTokenType(uint256 randomNumber)
+    function generateRandomTraits(uint256 randomNumber)
         private
-        returns (TokenType tokenType)
+        returns (TokenTraits memory tokenTraits)
     {
+        // GODS
         uint256 godsLeft = GODS_MAX_SUPPLY - godsCounter.current();
-        uint256 demiGodsLeft = DEMI_GODS_MAX_SUPPLY - demiGodsCounter.current();
+
+        // DEMI-GODS
+        uint256 creativeDemiGodsLeft = DEMI_GODS_SUBTYPE_MAX_SUPPLY -
+            creativeDemiGodsCounter.current();
+        uint256 destructiveDemiGodsLeft = DEMI_GODS_SUBTYPE_MAX_SUPPLY -
+            destructiveDemiGodsCounter.current();
+        uint256 demiGodsLeft = creativeDemiGodsLeft + destructiveDemiGodsLeft;
+
+        // ELEMENTALS
         uint256 elementalsLeft = ELEMENTALS_MAX_SUPPLY -
-            elementalsCounter.current();
+            earthElementalsCounter.current() -
+            waterElementalsCounter.current() -
+            fireElementalsCounter.current() -
+            airElementalsCounter.current() -
+            electricityElementalsCounter.current() -
+            metalElementalsCounter.current() -
+            magmaElementalsCounter.current();
+
         uint256 totalCountLeft = godsLeft + demiGodsLeft + elementalsLeft;
-        // Here we add 1 because we use the counts to define the type. If a count is at 0, we ignore it.
+
+        // We add 1 to modulos because we use the counts to define the type. If a count is at 0, we ignore it.
         // That's why we don't ever want the modulo to return 0.
         uint256 randomTypeIndex = (randomNumber % totalCountLeft) + 1;
         if (randomTypeIndex <= godsLeft) {
             godsCounter.increment();
-            return TokenType.GOD;
+            return TokenTraits(TokenType.GOD, TokenSubtype.NONE);
         } else if (randomTypeIndex <= godsLeft + demiGodsLeft) {
-            demiGodsCounter.increment();
-            return TokenType.DEMI_GOD;
+            uint256 randomSubtypeIndex = (randomNumber % demiGodsLeft) + 1;
+            if (randomSubtypeIndex <= creativeDemiGodsLeft) {
+                creativeDemiGodsCounter.increment();
+                return TokenTraits(TokenType.DEMI_GOD, TokenSubtype.CREATIVE);
+            } else {
+                destructiveDemiGodsCounter.increment();
+                return
+                    TokenTraits(TokenType.DEMI_GOD, TokenSubtype.DESTRUCTIVE);
+            }
         } else {
-            elementalsCounter.increment();
-            return TokenType.ELEMENTAL;
+            return generateElementalSubtype(randomNumber);
+        }
+    }
+
+    function generateElementalSubtype(uint256 randomNumber)
+        private
+        returns (TokenTraits memory traits)
+    {
+        // ELEMENTALS
+        uint256 earthElementalsLeft = ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY -
+            earthElementalsCounter.current();
+        uint256 waterElementalsLeft = ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY -
+            waterElementalsCounter.current();
+        uint256 fireElementalsLeft = ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY -
+            fireElementalsCounter.current();
+        uint256 airElementalsLeft = ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY -
+            airElementalsCounter.current();
+        uint256 electricityElementalsLeft = ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY -
+                electricityElementalsCounter.current();
+        uint256 metalElementalsLeft = ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY -
+            metalElementalsCounter.current();
+        uint256 magmaElementalsLeft = ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY -
+            magmaElementalsCounter.current();
+        uint256 elementalsLeft = earthElementalsLeft +
+            waterElementalsLeft +
+            fireElementalsLeft +
+            airElementalsLeft +
+            electricityElementalsLeft +
+            metalElementalsLeft +
+            magmaElementalsLeft;
+
+        uint256 randomSubtypeIndex = (randomNumber % elementalsLeft) + 1;
+        if (randomSubtypeIndex <= earthElementalsLeft) {
+            earthElementalsCounter.increment();
+            return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.EARTH);
+        } else if (
+            randomSubtypeIndex <= earthElementalsLeft + waterElementalsLeft
+        ) {
+            waterElementalsCounter.increment();
+            return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.WATER);
+        } else if (
+            randomSubtypeIndex <=
+            earthElementalsLeft + waterElementalsLeft + fireElementalsLeft
+        ) {
+            fireElementalsCounter.increment();
+            return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.FIRE);
+        } else if (
+            randomSubtypeIndex <=
+            earthElementalsLeft +
+                waterElementalsLeft +
+                fireElementalsLeft +
+                airElementalsLeft
+        ) {
+            airElementalsCounter.increment();
+            return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.AIR);
+        } else if (
+            randomSubtypeIndex <=
+            earthElementalsLeft +
+                waterElementalsLeft +
+                fireElementalsLeft +
+                airElementalsLeft +
+                electricityElementalsLeft
+        ) {
+            electricityElementalsCounter.increment();
+            return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.ELECTRICITY);
+        } else if (
+            randomSubtypeIndex <=
+            earthElementalsLeft +
+                waterElementalsLeft +
+                fireElementalsLeft +
+                airElementalsLeft +
+                electricityElementalsLeft +
+                metalElementalsLeft
+        ) {
+            metalElementalsCounter.increment();
+            return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.METAL);
+        } else {
+            magmaElementalsCounter.increment();
+            return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.MAGMA);
         }
     }
 
@@ -259,7 +383,7 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
      */
     modifier validTokenId(uint256 tokenId) {
         require(tokenId < MAX_SUPPLY, "Invalid tokenId");
-        require(tokenId > 0, "Invalid tokenId");
+        require(tokenId >= 0, "Invalid tokenId");
         _;
     }
 

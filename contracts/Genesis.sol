@@ -147,8 +147,6 @@ contract Genesis is ERC721Pausable, Ownable {
 
     /**
      * Function to mint the reserved gods
-     * TODO Add a to address to send directly to a wallet
-     * TODO Maybe we should remove the count and have this function run once to make it more simple
      * @param count number of gods to mint from the reserved pool
      */
     function mintReservedGods(uint256 count) external onlyOwner {

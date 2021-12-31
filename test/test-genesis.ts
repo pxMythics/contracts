@@ -488,7 +488,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       await contract.connect(owner).unpause();
       await contract.connect(owner).setBaseURI(constants.revealedURI);
       await expect(
-        supplyContract.connect(contract.address).getMetadataForTokenId(0),
+        supplyContract.connect(contract.address).getMetadataForTokenId(1000),
       ).to.be.revertedWith('Invalid tokenId');
       await expect(
         supplyContract.connect(contract.address).getMetadataForTokenId(1001),
@@ -512,15 +512,33 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       await contract.connect(owner).addFreeMinter(freeMintListed.address, 50);
       await contract.connect(freeMintListed).freeMint(50);
 
+      let i = 0;
+      let metadata: [number, number] & {
+        tokenType: number;
+        tokenSubtype: number;
+      };
+      // Check if subtypes are correct
+      for (; i < 60; i++) {
+        metadata = await supplyContract.getMetadataForTokenId(i);
+        if (metadata[0] === 0) {
+          expect(metadata![1]).to.be.equal(0);
+        } else if (metadata[0] === 1) {
+          expect(metadata![1]).to.be.greaterThan(0);
+          expect(metadata![1]).to.be.lessThan(3);
+        } else if (metadata[0] === 2) {
+          expect(metadata![1]).to.be.greaterThan(2);
+          expect(metadata![1]).to.be.lessThan(10);
+        } else {
+          // Should fail
+          expect(metadata![0]).to.be.greaterThanOrEqual(0);
+          expect(metadata![0]).to.be.lessThanOrEqual(2);
+        }
+      }
       // Metadata for token 0-9 are all Gods, since 0 is default value, we test over 9
       let foundNonGodMetadata = false;
-      let i = 10;
-      let metadata: [number] & { tokenType: number };
+      i = 10;
       while (!foundNonGodMetadata) {
         metadata = await supplyContract.getMetadataForTokenId(i);
-        console.log(
-          `checking id ${i} with metadata being ${JSON.stringify(metadata)}`,
-        );
         foundNonGodMetadata = metadata[0] > 0;
         i++;
       }
