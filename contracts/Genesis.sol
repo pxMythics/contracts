@@ -63,6 +63,12 @@ contract Genesis is ERC721Pausable, Ownable {
         return bytes(baseTokenURI).length > 0;
     }
 
+    // TODO Update with proper value
+    function contractURI() public pure returns (string memory) {
+        return
+            "https://ipfs.io/ipfs/QmWM2bNXKdNfHx9hjaf7ZYZRozdgAtwtExJ9h5npUEeJte";
+    }
+
     /**
      * Setters
      */

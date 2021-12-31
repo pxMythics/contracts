@@ -1,0 +1,8 @@
+{
+    "name": "pxMythics",
+    "description": "pxMythics is an NFT project based on the greatest mythologies to ever exist within the world.",
+    "image": "https://pxmythics.io/logo.png",
+    "external_link": "https://pxmythics.io",
+    "seller_fee_basis_points": 100, # Indicates a 1% seller fee.
+    "fee_recipient": "0xA97F337c39cccE66adfeCB2BF99C1DdC54C2D721" # Where seller fees will be paid to.
+  }
