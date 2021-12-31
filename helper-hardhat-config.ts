@@ -4,6 +4,7 @@ export interface networkConfigItem {
   mintPrice: string;
   keyHash: string;
   unrevealedURI: string;
+  openSeaProxyAddress: string;
   linkToken?: string;
   vrfCoordinator?: string;
 }
@@ -20,6 +21,7 @@ export const networkConfig: networkConfigInfo = {
       '0x6c3699283bda56ad74f6b855546325b68d482e983852a7a82979cc4807b641f4',
     mintPrice: '77000000000000000',
     unrevealedURI: 'ipfs://QmeZ9zGtFszp9q3fcK7MSoussjm4nBqR8xbQ1z8oDcGDYa',
+    openSeaProxyAddress: '0xf57b2c51ded3a29e6891aba85459d600256cf317',
   },
   31337: {
     name: 'localhost',
@@ -28,6 +30,7 @@ export const networkConfig: networkConfigInfo = {
       '0x6c3699283bda56ad74f6b855546325b68d482e983852a7a82979cc4807b641f4',
     mintPrice: '77000000000000000',
     unrevealedURI: 'ipfs://QmeZ9zGtFszp9q3fcK7MSoussjm4nBqR8xbQ1z8oDcGDYa',
+    openSeaProxyAddress: '0xf57b2c51ded3a29e6891aba85459d600256cf317',
   },
   42: {
     name: 'kovan',
@@ -38,6 +41,7 @@ export const networkConfig: networkConfigInfo = {
     chainlinkFee: '2000000000000000000',
     mintPrice: '77000000000000000',
     unrevealedURI: 'ipfs://QmeZ9zGtFszp9q3fcK7MSoussjm4nBqR8xbQ1z8oDcGDYa',
+    openSeaProxyAddress: '0xf57b2c51ded3a29e6891aba85459d600256cf317',
   },
   1: {
     name: 'mainnet',
@@ -49,6 +53,7 @@ export const networkConfig: networkConfigInfo = {
     mintPrice: '77000000000000000',
     // TODO: Update with final unrevealed file
     unrevealedURI: 'ipfs://QmeZ9zGtFszp9q3fcK7MSoussjm4nBqR8xbQ1z8oDcGDYa',
+    openSeaProxyAddress: '0xa5409ec958c83c3f309868babaca7c86dcb077c1',
   },
   4: {
     name: 'rinkeby',
@@ -59,6 +64,7 @@ export const networkConfig: networkConfigInfo = {
     chainlinkFee: '100000000000000000',
     mintPrice: '77000000000000000',
     unrevealedURI: 'ipfs://QmeZ9zGtFszp9q3fcK7MSoussjm4nBqR8xbQ1z8oDcGDYa',
+    openSeaProxyAddress: '0xf57b2c51ded3a29e6891aba85459d600256cf317',
   },
 };
 

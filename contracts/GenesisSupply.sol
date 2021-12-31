@@ -81,8 +81,6 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     bool public isRevealed;
     bytes32 public constant GENESIS_ROLE = keccak256("GENESIS_ROLE");
 
-    event Minted(uint256 tokenId);
-    event CollectionRandomized();
     // TODO Remove on final contract, for dev only
     event RequestedRandomNumber(bytes32 indexed requestId);
 
@@ -162,7 +160,6 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
             tokenIdToTraits[nextTokenId] = generateRandomTraits(
                 generateRandomNumber(nextTokenId)
             );
-            emit Minted(nextTokenId);
             tokenCounter.increment();
         }
         return (firstTokenId, firstTokenId + count);

@@ -24,6 +24,8 @@ const deployGenesis: DeployFunction = async function (
   const chainlinkFee: string = networkConfig[chainId].chainlinkFee;
   const mintPrice: string = networkConfig[chainId].mintPrice;
   const unrevealedURI: string = networkConfig[chainId].unrevealedURI;
+  const openSeaProxyAddress: string =
+    networkConfig[chainId].openSeaProxyAddress;
 
   console.log(`Deploying GenesisSupply on ${chainId}`);
   const genesisSupply = await deploy('GenesisSupply', {
@@ -34,7 +36,12 @@ const deployGenesis: DeployFunction = async function (
   console.log(`Deploying Genesis on ${chainId}`);
   const genesis = await deploy('Genesis', {
     from: deployer,
-    args: [genesisSupply.address, unrevealedURI, mintPrice],
+    args: [
+      genesisSupply.address,
+      unrevealedURI,
+      mintPrice,
+      openSeaProxyAddress,
+    ],
     log: true,
   });
   // Test network deployment only

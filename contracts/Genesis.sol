@@ -9,6 +9,15 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "./GenesisSupply.sol";
 import "hardhat/console.sol";
 
+contract OwnableDelegateProxy {}
+
+/**
+ * Used to delegate ownership of a contract to another address, to save on unneeded transactions to approve contract use for users
+ */
+contract ProxyRegistry {
+    mapping(address => OwnableDelegateProxy) public proxies;
+}
+
 contract Genesis is ERC721Pausable, Ownable {
     using SafeMath for uint256;
     using Counters for Counters.Counter;
@@ -28,17 +37,18 @@ contract Genesis is ERC721Pausable, Ownable {
     bytes32 private whiteListMerkleTreeRoot;
 
     address genesisSupplyAddress;
-
-    event Minted(uint256 tokenId);
+    address proxyRegistryAddress;
 
     constructor(
         address _genesisSupplyAddress,
         string memory _unrevealedURI,
-        uint256 _price
+        uint256 _price,
+        address _proxyRegistryAddress
     ) ERC721("Mythical Sega", "MS") {
         genesisSupplyAddress = _genesisSupplyAddress;
         unrevealedURI = _unrevealedURI;
         price = _price;
+        proxyRegistryAddress = _proxyRegistryAddress;
         _pause();
     }
 
@@ -211,5 +221,23 @@ contract Genesis is ERC721Pausable, Ownable {
         require(balance > 0, "No ether left to withdraw");
         (bool success, ) = (msg.sender).call{value: balance}("");
         require(success, "Transfer failed.");
+    }
+
+    /**
+     * Override isApprovedForAll to whitelist user's ProxyRegistry proxy accounts to enable gas-less listings.
+     */
+    function isApprovedForAll(address owner, address operator)
+        public
+        view
+        override
+        returns (bool)
+    {
+        // Whitelist OpenSea proxy contract for easy trading.
+        ProxyRegistry proxyRegistry = ProxyRegistry(proxyRegistryAddress);
+        if (address(proxyRegistry.proxies(owner)) == operator) {
+            return true;
+        }
+
+        return super.isApprovedForAll(owner, operator);
     }
 }
