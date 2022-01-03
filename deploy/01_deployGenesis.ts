@@ -22,30 +22,13 @@ const deployGenesis: DeployFunction = async function (
   const openSeaProxyAddress: string =
     networkConfig[chainId].openSeaProxyAddress;
 
-  if (chainId !== '31137') {
-    console.log(`Deploying GenesisSupply on ${chainId}`);
-    const genesisSupply = await deploy('GenesisSupply', {
-      from: deployer,
-      args: [vrfCoordinatorAddress, linkTokenAddress, keyHash, chainlinkFee],
-      log: true,
-    });
-    console.log(`Deploying Genesis on ${chainId}`);
-    await deploy('Genesis', {
-      from: deployer,
-      args: [
-        genesisSupply.address,
-        unrevealedURI,
-        mintPrice,
-        openSeaProxyAddress,
-      ],
-      log: true,
-    });
-  }
   // Test network deployment only
   if (chainId === '31337') {
     const linkToken = await get('LinkToken');
     const VRFCoordinatorMock = await get('VRFCoordinatorMock');
-    console.log(`Deploying GenesisSupply on ${chainId}`);
+    console.log(
+      `Deploying GenesisSupply on ${chainId} with link address ${linkToken.address} and coordinator address ${VRFCoordinatorMock.address}`,
+    );
     const genesisSupply = await deploy('GenesisSupply', {
       from: deployer,
       args: [
@@ -56,7 +39,9 @@ const deployGenesis: DeployFunction = async function (
       ],
       log: true,
     });
-    console.log(`Deploying Genesis on ${chainId}`);
+    console.log(
+      `Deploying Genesis on ${chainId} with supply address ${genesisSupply.address}`,
+    );
     const genesis = await deploy('Genesis', {
       from: deployer,
       args: [
@@ -90,7 +75,27 @@ const deployGenesis: DeployFunction = async function (
     console.log(`Genesis supply (${genesisSupply.address}) funded with LINK`);
     const balance = await link.balanceOf(genesisSupply.address);
     console.log(`Genesis supply LINK balance: ${balance}`);
+    // Live networks
+  } else {
+    console.log(`Live network deploying GenesisSupply on ${chainId}`);
+    const genesisSupply = await deploy('GenesisSupply', {
+      from: deployer,
+      args: [vrfCoordinatorAddress, linkTokenAddress, keyHash, chainlinkFee],
+      log: true,
+    });
+    console.log(`Live network deploying Genesis on ${chainId}`);
+    await deploy('Genesis', {
+      from: deployer,
+      args: [
+        genesisSupply.address,
+        unrevealedURI,
+        mintPrice,
+        openSeaProxyAddress,
+      ],
+      log: true,
+    });
   }
 };
+
 export default deployGenesis;
 deployGenesis.tags = ['all', 'genesis'];

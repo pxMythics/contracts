@@ -6,8 +6,24 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import "./GenesisSupply.sol";
-import "hardhat/console.sol";
+
+// Supply ABI needed from Genesis Contract
+contract DeployedSupply {
+    function setIsRevealed(bool _isRevealed) external {}
+
+    function reservedGodsCurrentIndexAndSupply()
+        public
+        view
+        returns (uint256 index, uint256 supply)
+    {}
+
+    function mint(uint256 count)
+        public
+        returns (uint256 startIndex, uint256 endIndex)
+    {}
+
+    function mintReservedGods(uint256 count) public {}
+}
 
 contract OwnableDelegateProxy {}
 
@@ -36,8 +52,8 @@ contract Genesis is ERC721Pausable, Ownable {
      */
     bytes32 private whiteListMerkleTreeRoot;
 
-    address genesisSupplyAddress;
-    address proxyRegistryAddress;
+    DeployedSupply private supply;
+    address private proxyRegistryAddress;
 
     constructor(
         address _genesisSupplyAddress,
@@ -45,7 +61,7 @@ contract Genesis is ERC721Pausable, Ownable {
         uint256 _price,
         address _proxyRegistryAddress
     ) ERC721("Mythical Sega", "MS") {
-        genesisSupplyAddress = _genesisSupplyAddress;
+        supply = DeployedSupply(_genesisSupplyAddress);
         unrevealedURI = _unrevealedURI;
         price = _price;
         proxyRegistryAddress = _proxyRegistryAddress;
@@ -69,12 +85,16 @@ contract Genesis is ERC721Pausable, Ownable {
             "https://ipfs.io/ipfs/QmWM2bNXKdNfHx9hjaf7ZYZRozdgAtwtExJ9h5npUEeJte";
     }
 
+    function totalSupply() external pure returns (uint256) {
+        return 1001;
+    }
+
     /**
      * Setters
      */
     function setBaseURI(string memory _baseTokenURI) external onlyOwner {
         // Set in Supply contract for the `getMetadataForTokenId` function
-        GenesisSupply(genesisSupplyAddress).setIsRevealed(true);
+        supply.setIsRevealed(true);
         baseTokenURI = _baseTokenURI;
     }
 
@@ -131,9 +151,7 @@ contract Genesis is ERC721Pausable, Ownable {
             "Trying to mint more than allowed"
         );
 
-        (uint256 startIndex, uint256 endIndex) = GenesisSupply(
-            genesisSupplyAddress
-        ).mint(count);
+        (uint256 startIndex, uint256 endIndex) = supply.mint(count);
 
         for (uint256 i = startIndex; i < endIndex; i++) {
             _mint(msg.sender, i);
@@ -157,7 +175,7 @@ contract Genesis is ERC721Pausable, Ownable {
         require(msg.value >= price, "Not enough ETH");
         uint256 mintCount = balanceOf(msg.sender);
         require(mintCount < WHITELIST_MINT_COUNT, "Already minted");
-        (uint256 startIndex, ) = GenesisSupply(genesisSupplyAddress).mint(1);
+        (uint256 startIndex, ) = supply.mint(1);
         _mint(msg.sender, startIndex);
     }
 
@@ -166,14 +184,13 @@ contract Genesis is ERC721Pausable, Ownable {
      * @param count number of gods to mint from the reserved pool
      */
     function mintReservedGods(uint256 count) external onlyOwner {
-        (uint256 startingIndex, uint256 maxSupply) = GenesisSupply(
-            genesisSupplyAddress
-        ).reservedGodsCurrentIndexAndSupply();
+        (uint256 startingIndex, uint256 maxSupply) = supply
+            .reservedGodsCurrentIndexAndSupply();
         require(
             startingIndex + count <= maxSupply,
             "Not enough reserved gods left"
         );
-        GenesisSupply(genesisSupplyAddress).mintReservedGods(count);
+        supply.mintReservedGods(count);
         // We use the current index if the reserved is done in multiple parts
         for (uint256 i = startingIndex; i < count + startingIndex; i++) {
             _mint(msg.sender, i);
