@@ -11,7 +11,6 @@ import {
   addLinkFundIfNeeded,
   addressZero,
   deployTestContract,
-  fullMint,
   generateSeed,
 } from './test-utils';
 
@@ -72,6 +71,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       );
       expect(await contract.WHITELIST_MINT_COUNT()).to.equal(1);
       expect(await contract.paused()).to.be.true;
+      expect(await contract.totalSupply()).to.be.equal(constants.totalSupply);
     });
 
     it('Should set the right owner', async () => {
@@ -275,7 +275,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       it('A user on the whitelist can mint with a valid nonce and proof', async function () {
         expect(
           await supplyContract.connect(contract.address).currentIndex(),
-        ).to.equal(10);
+        ).to.equal(constants.reservedGodsCount);
         expect(await contract.balanceOf(whitelisted.address)).to.equal(0);
         await expect(
           contract
@@ -285,7 +285,11 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
             }),
         )
           .to.emit(contract, 'Transfer')
-          .withArgs(addressZero, whitelisted.address, 10);
+          .withArgs(
+            addressZero,
+            whitelisted.address,
+            constants.reservedGodsCount,
+          );
         expect(
           await supplyContract.connect(contract.address).currentIndex(),
         ).to.equal(11);
@@ -295,14 +299,14 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       it('A user on the free mint list can mint', async function () {
         expect(
           await supplyContract.connect(contract.address).currentIndex(),
-        ).to.equal(10);
+        ).to.equal(constants.reservedGodsCount);
         expect(await contract.balanceOf(whitelisted.address)).to.equal(0);
 
         const multipleFreeMintTx = await contract
           .connect(freeMintListed)
           .freeMint(2);
         const multipleFreeMintReceipt = await multipleFreeMintTx.wait();
-        let freeMintIndex = 10;
+        let freeMintIndex = constants.reservedGodsCount;
         for (const event of multipleFreeMintReceipt.events || []) {
           if (event.event === 'Transfer') {
             expect(event.args![2].toNumber()).to.equal(freeMintIndex);
@@ -316,14 +320,14 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         expect(await contract.balanceOf(freeMintListed.address)).to.equal(2);
       });
 
-      it('Mint the 10 reserved gods (single transaction)', async function () {
+      it('Mint the 11 reserved gods (single transaction)', async function () {
         let returnValue = await supplyContract
           .connect(contract.address)
           .reservedGodsCurrentIndexAndSupply();
         expect(returnValue[0]).to.equal(0);
         const multipleFreeMintTx = await contract
           .connect(owner)
-          .mintReservedGods(10);
+          .mintReservedGods(constants.reservedGodsCount);
         const multipleFreeMintReceipt = await multipleFreeMintTx.wait();
         let freeMintIndex = 0;
         for (const event of multipleFreeMintReceipt.events || []) {
@@ -335,7 +339,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         returnValue = await supplyContract
           .connect(contract.address)
           .reservedGodsCurrentIndexAndSupply();
-        expect(returnValue[0]).to.equal(10);
+        expect(returnValue[0]).to.equal(constants.reservedGodsCount);
 
         expect(await contract.balanceOf(owner.address)).to.equal(10);
         await expect(
@@ -343,7 +347,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         ).to.be.revertedWith('Not enough reserved gods left');
       });
 
-      it('Mint the 10 reserved gods (multiple transaction)', async function () {
+      it('Mint the 11 reserved gods (multiple transaction)', async function () {
         let returnValue = await supplyContract
           .connect(contract.address)
           .reservedGodsCurrentIndexAndSupply();
@@ -366,7 +370,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
 
         expect(await contract.balanceOf(owner.address)).to.equal(3);
 
-        multipleFreeMintTx = await contract.connect(owner).mintReservedGods(7);
+        multipleFreeMintTx = await contract.connect(owner).mintReservedGods(8);
         multipleFreeMintReceipt = await multipleFreeMintTx.wait();
         for (const event of multipleFreeMintReceipt.events || []) {
           if (event.event === 'Transfer') {
@@ -378,9 +382,11 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         returnValue = await supplyContract
           .connect(contract.address)
           .reservedGodsCurrentIndexAndSupply();
-        expect(returnValue[0]).to.equal(10);
+        expect(returnValue[0]).to.equal(constants.reservedGodsCount);
 
-        expect(await contract.balanceOf(owner.address)).to.equal(10);
+        expect(await contract.balanceOf(owner.address)).to.equal(
+          constants.reservedGodsCount,
+        );
         await expect(
           contract.connect(owner).mintReservedGods(1),
         ).to.be.revertedWith('Not enough reserved gods left');
@@ -407,12 +413,12 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
 
   describe('GenesisSupplyContract', () => {
     it('Should initialize the GenesisSupply contract', async () => {
-      expect(await supplyContract.MAX_SUPPLY()).to.equal(1000);
+      expect(await supplyContract.MAX_SUPPLY()).to.equal(constants.totalSupply);
       const returnValue = await supplyContract
         .connect(contract.address)
         .reservedGodsCurrentIndexAndSupply();
       expect(returnValue[0]).to.equal(0);
-      expect(returnValue[1]).to.equal(10);
+      expect(returnValue[1]).to.equal(constants.reservedGodsCount);
     });
 
     it('Only the Genesis can access the reservedGodsCurrentIndex', async () => {

@@ -2,28 +2,10 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-
-// Supply ABI needed from Genesis Contract
-contract DeployedSupply {
-    function setIsRevealed(bool _isRevealed) external {}
-
-    function reservedGodsCurrentIndexAndSupply()
-        public
-        view
-        returns (uint256 index, uint256 supply)
-    {}
-
-    function mint(uint256 count)
-        public
-        returns (uint256 startIndex, uint256 endIndex)
-    {}
-
-    function mintReservedGods(uint256 count) public {}
-}
+import "./interfaces/GenesisSupplyInterface.sol";
 
 contract OwnableDelegateProxy {}
 
@@ -247,7 +229,8 @@ contract Genesis is ERC721Pausable, Ownable {
     }
 
     /**
-     * Override isApprovedForAll to whitelist user's ProxyRegistry proxy accounts to enable gas-less listings.
+     * Override isApprovedForAll to whitelist user's ProxyRegistry proxy accounts to
+     * enable gas-less listings.
      */
     function isApprovedForAll(address owner, address operator)
         public
