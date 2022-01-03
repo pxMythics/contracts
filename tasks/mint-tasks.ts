@@ -4,6 +4,35 @@ import { subtask, task } from 'hardhat/config';
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { constants } from '../test/constants';
 
+// TODO: Clean this
+export const livePrepareForMint = task(
+  'live-prepare-mint',
+  'Prepare live contracts for minting',
+)
+  .addParam('genesisaddress', "The Genesis's address")
+  .addParam('genesissupplyaddress', "The GenesisSupply's address")
+  .setAction(async (taskArgs, hre: HardhatRuntimeEnvironment) => {
+    const { ethers } = hre;
+    const genesisContract = await ethers.getContractAt(
+      'Genesis',
+      taskArgs.genesisaddress,
+    );
+    const supplyContract = await ethers.getContractAt(
+      'GenesisSupply',
+      taskArgs.genesissupplyaddress,
+    );
+    const signers = await ethers.getSigners();
+    const owner = signers[0];
+    console.log('unpausing...');
+    await genesisContract.connect(owner).unpause();
+    console.log('setting genesis role...');
+    await supplyContract
+      .connect(owner)
+      .grantRole(constants.genesisRole, taskArgs.genesisaddress);
+    console.log('generating seed...');
+    await supplyContract.connect(owner).generateSeed();
+  });
+
 export const prepareForMint = task(
   'prepare-mint',
   'Prepare contracts for minting',

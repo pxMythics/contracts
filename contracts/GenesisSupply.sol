@@ -44,14 +44,14 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
      * Supply
      */
 
-    uint256 public constant MAX_SUPPLY = 1000;
+    uint256 public constant MAX_SUPPLY = 1001;
     uint256 public constant GODS_MAX_SUPPLY = 50;
     uint256 public constant DEMI_GODS_MAX_SUPPLY = 400;
     uint256 public constant DEMI_GODS_SUBTYPE_MAX_SUPPLY = 200;
     uint256 public constant ELEMENTALS_MAX_SUPPLY = 550;
     uint256 public constant ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY = 100;
     uint256 public constant ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY = 50;
-    uint256 public constant RESERVED_GODS_MAX_SUPPLY = 10;
+    uint256 public constant RESERVED_GODS_MAX_SUPPLY = 11;
 
     /**
      * Counters
