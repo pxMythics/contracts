@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
 contract GenesisSupply is VRFConsumerBase, AccessControl {
-    using SafeMath for uint256;
     using Counters for Counters.Counter;
 
     enum TokenType {

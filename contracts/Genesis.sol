@@ -17,7 +17,6 @@ contract ProxyRegistry {
 }
 
 contract Genesis is ERC721Pausable, Ownable {
-    using SafeMath for uint256;
     using Counters for Counters.Counter;
 
     /**
