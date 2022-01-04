@@ -292,7 +292,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           );
         expect(
           await supplyContract.connect(contract.address).currentIndex(),
-        ).to.equal(11);
+        ).to.equal(12);
         expect(await contract.balanceOf(whitelisted.address)).to.equal(1);
       });
 
@@ -316,7 +316,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
 
         expect(
           await supplyContract.connect(contract.address).currentIndex(),
-        ).to.equal(12);
+        ).to.equal(13);
         expect(await contract.balanceOf(freeMintListed.address)).to.equal(2);
       });
 
@@ -341,7 +341,9 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           .reservedGodsCurrentIndexAndSupply();
         expect(returnValue[0]).to.equal(constants.reservedGodsCount);
 
-        expect(await contract.balanceOf(owner.address)).to.equal(10);
+        expect(await contract.balanceOf(owner.address)).to.equal(
+          constants.reservedGodsCount,
+        );
         await expect(
           contract.connect(owner).mintReservedGods(1),
         ).to.be.revertedWith('Not enough reserved gods left');
@@ -493,9 +495,6 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
     it('No metadata is returned if trying to access an invalid token id', async function () {
       await contract.connect(owner).unpause();
       await contract.connect(owner).setBaseURI(constants.revealedURI);
-      await expect(
-        supplyContract.connect(contract.address).getMetadataForTokenId(1000),
-      ).to.be.revertedWith('Invalid tokenId');
       await expect(
         supplyContract.connect(contract.address).getMetadataForTokenId(1001),
       ).to.be.revertedWith('Invalid tokenId');
