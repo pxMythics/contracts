@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 // TODO This should also be fetched from the contract
 export const constants = {
   totalSupply: 1001,
-  reservedGodsCount: 11,
+  reservedGodsCount: 6,
   mintPrice: '0.077',
   unrevealedURI: 'ipfs://QmeZ9zGtFszp9q3fcK7MSoussjm4nBqR8xbQ1z8oDcGDYa',
   revealedURI:

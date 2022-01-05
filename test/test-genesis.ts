@@ -71,7 +71,9 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       );
       expect(await contract.WHITELIST_MINT_COUNT()).to.equal(1);
       expect(await contract.paused()).to.be.true;
-      expect(await contract.totalSupply()).to.be.equal(constants.totalSupply);
+      expect(await contract.totalSupply()).to.be.equal(
+        constants.reservedGodsCount,
+      );
     });
 
     it('Should set the right owner', async () => {
@@ -292,7 +294,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           );
         expect(
           await supplyContract.connect(contract.address).currentIndex(),
-        ).to.equal(12);
+        ).to.equal(constants.reservedGodsCount + 1);
         expect(await contract.balanceOf(whitelisted.address)).to.equal(1);
       });
 
@@ -316,11 +318,11 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
 
         expect(
           await supplyContract.connect(contract.address).currentIndex(),
-        ).to.equal(13);
+        ).to.equal(constants.reservedGodsCount + 2);
         expect(await contract.balanceOf(freeMintListed.address)).to.equal(2);
       });
 
-      it('Mint the 11 reserved gods (single transaction)', async function () {
+      it('Mint the 6 reserved gods (single transaction)', async function () {
         let returnValue = await supplyContract
           .connect(contract.address)
           .reservedGodsCurrentIndexAndSupply();
@@ -349,7 +351,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         ).to.be.revertedWith('Not enough reserved gods left');
       });
 
-      it('Mint the 11 reserved gods (multiple transaction)', async function () {
+      it('Mint the 6 reserved gods (multiple transaction)', async function () {
         let returnValue = await supplyContract
           .connect(contract.address)
           .reservedGodsCurrentIndexAndSupply();
@@ -372,7 +374,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
 
         expect(await contract.balanceOf(owner.address)).to.equal(3);
 
-        multipleFreeMintTx = await contract.connect(owner).mintReservedGods(8);
+        multipleFreeMintTx = await contract.connect(owner).mintReservedGods(3);
         multipleFreeMintReceipt = await multipleFreeMintTx.wait();
         for (const event of multipleFreeMintReceipt.events || []) {
           if (event.event === 'Transfer') {
@@ -525,18 +527,25 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       // Check if subtypes are correct
       for (; i < 60; i++) {
         metadata = await supplyContract.getMetadataForTokenId(i);
-        if (metadata[0] === 0) {
+        let caca = await supplyContract.getMetadataForTokenId(1);
+        console.log(`got metadata for ${1} ${caca[0]}`);
+        caca = await supplyContract.getMetadataForTokenId(5);
+        console.log(`got metadata for ${5} ${caca[0]}`);
+        caca = await supplyContract.getMetadataForTokenId(6);
+        console.log(`got metadata for ${6} ${caca[0]}`);
+        if (metadata[0] === 1) {
           expect(metadata![1]).to.be.equal(0);
-        } else if (metadata[0] === 1) {
+        } else if (metadata[0] === 2) {
           expect(metadata![1]).to.be.greaterThan(0);
           expect(metadata![1]).to.be.lessThan(3);
-        } else if (metadata[0] === 2) {
+        } else if (metadata[0] === 3) {
           expect(metadata![1]).to.be.greaterThan(2);
           expect(metadata![1]).to.be.lessThan(10);
         } else {
-          // Should fail
-          expect(metadata![0]).to.be.greaterThanOrEqual(0);
-          expect(metadata![0]).to.be.lessThanOrEqual(2);
+          console.log(`got invalid metadata for ${i} ${metadata[0]}`);
+          // Unset data, shouldn't happen
+          expect(metadata![0]).to.not.be.equal(0);
+          expect(metadata![0]).to.not.be.equal(0);
         }
       }
       // Metadata for token 0-9 are all Gods, since 0 is default value, we test over 9
@@ -544,10 +553,11 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       i = 10;
       while (!foundNonGodMetadata) {
         metadata = await supplyContract.getMetadataForTokenId(i);
-        foundNonGodMetadata = metadata[0] > 0;
+        foundNonGodMetadata = metadata[0] > 1;
         i++;
       }
-      expect(metadata![0]).to.not.be.equal(0);
+      expect(metadata![0]).to.be.greaterThan(1);
+      expect(metadata![1]).to.be.greaterThan(0);
     });
   });
 });

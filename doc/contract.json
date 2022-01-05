@@ -1,8 +1,8 @@
 {
-    "name": "pxMythics",
-    "description": "pxMythics is an NFT project based on the greatest mythologies to ever exist within the world.",
-    "image": "https://pxmythics.io/logo.png",
+    "name": "pxMythics Genesis",
+    "description": "pxMythics is an NFT project based on the greatest mythologies throughout history.\n\nIt is a blending of the ancient past and the rapidly approaching future - the greatest legends ever told, immortalized by technology that will define the future.",
+    "image": "https://pxmythics.io/logo512.png",
     "external_link": "https://pxmythics.io",
-    "seller_fee_basis_points": 100, # Indicates a 1% seller fee.
-    "fee_recipient": "0xA97F337c39cccE66adfeCB2BF99C1DdC54C2D721" # Where seller fees will be paid to.
+    "seller_fee_basis_points": 770,
+    "fee_recipient": "0x66fcB15Cb50E276AdeaE3BC22097E53245BCCe9d" 
   }

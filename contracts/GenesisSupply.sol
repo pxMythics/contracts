@@ -9,6 +9,7 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     using Counters for Counters.Counter;
 
     enum TokenType {
+        NONE,
         GOD,
         DEMI_GOD,
         ELEMENTAL
@@ -44,13 +45,13 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
      */
 
     uint256 public constant MAX_SUPPLY = 1001;
-    uint256 public constant GODS_MAX_SUPPLY = 50;
+    uint256 public constant GODS_MAX_SUPPLY = 51;
     uint256 public constant DEMI_GODS_MAX_SUPPLY = 400;
     uint256 public constant DEMI_GODS_SUBTYPE_MAX_SUPPLY = 200;
     uint256 public constant ELEMENTALS_MAX_SUPPLY = 550;
     uint256 public constant ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY = 100;
     uint256 public constant ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY = 50;
-    uint256 public constant RESERVED_GODS_MAX_SUPPLY = 11;
+    uint256 public constant RESERVED_GODS_MAX_SUPPLY = 6;
 
     /**
      * Counters
@@ -89,11 +90,10 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         uint256 _fee
     ) VRFConsumerBase(vrfCoordinator, linkToken) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        // TODO start other counters at 1 to save on gas
         keyHash = _keyhash;
         fee = _fee;
         isRevealed = false;
-        // reserve 10 gods for owner
+        // reserve 6 gods for owner
         for (uint256 i = 0; i < RESERVED_GODS_MAX_SUPPLY; i++) {
             godsCounter.increment();
             tokenCounter.increment();
@@ -149,7 +149,7 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         returns (uint256 startIndex, uint256 endIndex)
     {
         require(
-            tokenCounter.current() + count < MAX_SUPPLY,
+            tokenCounter.current() + count < MAX_SUPPLY + 1,
             "Not enough supply"
         );
         uint256 firstTokenId = tokenCounter.current();

@@ -1,6 +1,5 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
@@ -17,8 +16,6 @@ contract ProxyRegistry {
 }
 
 contract Genesis is ERC721Pausable, Ownable {
-    using Counters for Counters.Counter;
-
     /**
      * Mint parameters
      */
@@ -41,7 +38,7 @@ contract Genesis is ERC721Pausable, Ownable {
         string memory _unrevealedURI,
         uint256 _price,
         address _proxyRegistryAddress
-    ) ERC721("Mythical Sega", "MS") {
+    ) ERC721("Mythics Genesis", "MGEN") {
         supply = DeployedSupply(_genesisSupplyAddress);
         unrevealedURI = _unrevealedURI;
         price = _price;
@@ -60,14 +57,13 @@ contract Genesis is ERC721Pausable, Ownable {
         return bytes(baseTokenURI).length > 0;
     }
 
-    // TODO Update with proper value
     function contractURI() public pure returns (string memory) {
         return
-            "https://ipfs.io/ipfs/QmWM2bNXKdNfHx9hjaf7ZYZRozdgAtwtExJ9h5npUEeJte";
+            "https://ipfs.io/ipfs/QmbZwPZgKS6YJkT2U4Vmp87udA6Cfy4Tu63KKDv4QnncU2";
     }
 
-    function totalSupply() external pure returns (uint256) {
-        return 1001;
+    function totalSupply() external view returns (uint256) {
+        return supply.currentIndex();
     }
 
     /**

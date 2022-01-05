@@ -87,7 +87,7 @@ export const createRandomWallet = async (
   const sendFundsTx = {
     from: funder.address,
     to: wallet.address,
-    value: ethers.utils.parseEther('0.1'),
+    value: ethers.utils.parseEther('0.5'),
   };
 
   await funder.sendTransaction(sendFundsTx);
@@ -117,9 +117,9 @@ export const fullMint = async (
   freeMinter: SignerWithAddress,
 ) => {
   // Add a free minter that can mint everything
-  await contract.connect(owner).addFreeMinter(freeMinter.address, 990);
-  await contract.connect(owner).mintReservedGods(10);
-  await contract.connect(freeMinter).freeMint(990);
+  await contract.connect(owner).addFreeMinter(freeMinter.address, 995);
+  await contract.connect(owner).mintReservedGods(constants.reservedGodsCount);
+  await contract.connect(freeMinter).freeMint(995);
 };
 
 /**

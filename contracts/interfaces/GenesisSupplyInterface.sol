@@ -5,6 +5,8 @@ pragma solidity ^0.8.0;
 contract DeployedSupply {
     function setIsRevealed(bool _isRevealed) external {}
 
+    function currentIndex() public view returns (uint256 index) {}
+
     function reservedGodsCurrentIndexAndSupply()
         public
         view
