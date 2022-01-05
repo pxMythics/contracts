@@ -515,7 +515,10 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         VRFCoordinatorMock.address,
       );
 
-      // Mint 50, we should expect one to not be a god (there's 50 gods and 10 are reserved)
+      // Mint 50, we should expect one to not be a god (there's 50 gods and 6 are reserved)
+      await contract
+        .connect(owner)
+        .mintReservedGods(constants.reservedGodsCount);
       await contract.connect(owner).addFreeMinter(freeMintListed.address, 50);
       await contract.connect(freeMintListed).freeMint(50);
 
@@ -525,14 +528,8 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         tokenSubtype: number;
       };
       // Check if subtypes are correct
-      for (; i < 60; i++) {
+      for (; i < constants.reservedGodsCount + 50; i++) {
         metadata = await supplyContract.getMetadataForTokenId(i);
-        let caca = await supplyContract.getMetadataForTokenId(1);
-        console.log(`got metadata for ${1} ${caca[0]}`);
-        caca = await supplyContract.getMetadataForTokenId(5);
-        console.log(`got metadata for ${5} ${caca[0]}`);
-        caca = await supplyContract.getMetadataForTokenId(6);
-        console.log(`got metadata for ${6} ${caca[0]}`);
         if (metadata[0] === 1) {
           expect(metadata![1]).to.be.equal(0);
         } else if (metadata[0] === 2) {
@@ -542,7 +539,6 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           expect(metadata![1]).to.be.greaterThan(2);
           expect(metadata![1]).to.be.lessThan(10);
         } else {
-          console.log(`got invalid metadata for ${i} ${metadata[0]}`);
           // Unset data, shouldn't happen
           expect(metadata![0]).to.not.be.equal(0);
           expect(metadata![0]).to.not.be.equal(0);

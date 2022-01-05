@@ -80,9 +80,6 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     bool public isRevealed;
     bytes32 public constant GENESIS_ROLE = keccak256("GENESIS_ROLE");
 
-    // TODO Remove on final contract, for dev only
-    event RequestedRandomNumber(bytes32 indexed requestId);
-
     constructor(
         address vrfCoordinator,
         address linkToken,
@@ -173,8 +170,8 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         // Here we don't need to increment counter and god supply counter because we already do in the constructor
         // to not initialize the counters at 0
         for (uint256 i = nextIndex; i < count + nextIndex; i++) {
-            reservedGodsTransfered.increment();
             tokenIdToTraits[i] = TokenTraits(TokenType.GOD, TokenSubtype.NONE);
+            reservedGodsTransfered.increment();
         }
     }
 
@@ -186,7 +183,6 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         require(randomizationRequestId == 0, "Randomization already started");
         require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
         randomizationRequestId = requestRandomness(keyHash, fee);
-        emit RequestedRandomNumber(randomizationRequestId);
     }
 
     /**
