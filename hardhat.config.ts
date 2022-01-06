@@ -53,6 +53,10 @@ module.exports = {
       url: RINKEBY_API_URL,
       accounts: [RINKEBY_PRIVATE_KEY],
     },
+    mainnet: {
+      url: MAINNET_API_URL,
+      accounts: [MAINNET_PRIVATE_KEY],
+    },
   },
   gasReporter: {
     enabled: !!REPORT_GAS,
@@ -66,6 +70,7 @@ module.exports = {
       default: 9,
       1: 9,
       rinkeby: 0,
+      mainnet: 0,
     },
   },
   contractSizer: {
