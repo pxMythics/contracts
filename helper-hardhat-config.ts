@@ -49,10 +49,9 @@ export const networkConfig: networkConfigInfo = {
     keyHash:
       '0xAA77729D3466CA35AE8D28B3BBAC7CC36A5031EFDC430821C02BC31A238AF445',
     vrfCoordinator: '0xf0d54349aDdcf704F77AE15b96510dEA15cb7952',
-    chainlinkFee: '100000000000000000',
+    chainlinkFee: '2000000000000000000',
     mintPrice: '77000000000000000',
-    // TODO: Update with final unrevealed file
-    unrevealedURI: 'ipfs://QmeZ9zGtFszp9q3fcK7MSoussjm4nBqR8xbQ1z8oDcGDYa',
+    unrevealedURI: 'ipfs://Qmf28aAuBptYHtVE9pDoU9sPtFV4U898zTsBuMjBxFXYKQ',
     openSeaProxyAddress: '0xa5409ec958c83c3f309868babaca7c86dcb077c1',
   },
   4: {
