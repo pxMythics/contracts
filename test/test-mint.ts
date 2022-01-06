@@ -51,6 +51,9 @@ describe('Genesis full minting function', function () {
 
     // Add free minters
     const freeMinterWallets: Wallet[] = await createRandomWallets(10, funder);
+    expect(await contract.totalSupply()).to.be.equal(
+      constants.reservedGodsCount,
+    );
 
     console.log('Random wallets generated');
     console.log('Starting the mint process...');
@@ -81,10 +84,6 @@ describe('Genesis full minting function', function () {
       }
     }
 
-    await expect(contract.totalSupply()).to.be.equal(
-      constants.reservedGodsCount,
-    );
-
     console.log('Minting free mints...');
     for (let i = 0; i < 10; i++) {
       const multipleFreeMintTx = await contract
@@ -99,8 +98,8 @@ describe('Genesis full minting function', function () {
           freeMintIndex++;
         }
       }
-      await expect(contract.totalSupply()).to.be.equal(
-        constants.reservedGodsCount + i * 2,
+      expect(await contract.totalSupply()).to.be.equal(
+        constants.reservedGodsCount + (i + 1) * 2,
       );
     }
 
@@ -124,12 +123,14 @@ describe('Genesis full minting function', function () {
           minterWallets[i].address,
           i + constants.reservedGodsCount + 20,
         );
-      await expect(contract.totalSupply()).to.be.equal(
-        constants.reservedGodsCount + 20 + i,
+
+      expect(await contract.totalSupply()).to.be.equal(
+        constants.reservedGodsCount + 20 + i + 1,
       );
     }
 
     console.log('Minting over the limit...');
+    expect(await contract.totalSupply()).to.be.equal(1001);
     await expect(
       contract
         .connect(minterWallets[totalWallet - 1])
@@ -141,6 +142,7 @@ describe('Genesis full minting function', function () {
           },
         ),
     ).to.be.revertedWith('Not enough supply');
+    expect(await contract.totalSupply()).to.be.equal(1001);
 
     console.log('Outputting generated collection types');
     let metadata;
