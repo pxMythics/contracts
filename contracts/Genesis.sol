@@ -24,6 +24,8 @@ contract Genesis is ERC721Pausable, Ownable {
     string public unrevealedURI;
     string public baseTokenURI;
     mapping(address => uint256) private addressToMaxFreeMintCount;
+    mapping(address => uint256) private addressToMintCount;
+    mapping(address => bool) private addressToAirdrop;
 
     /**
      * Merkle tree properties
@@ -119,19 +121,39 @@ contract Genesis is ERC721Pausable, Ownable {
      */
     function freeMint(uint256 count) external whenNotPaused {
         require(
+            addressToMintCount[msg.sender] <
+                addressToMaxFreeMintCount[msg.sender],
+            "Already minted"
+        );
+        require(
             addressToMaxFreeMintCount[msg.sender] > 0,
             "Address is not in the free mint list"
         );
-        uint256 mintCount = balanceOf(msg.sender) + count;
+        uint256 mintCount = addressToMintCount[msg.sender] + count;
         require(
-            mintCount <= addressToMaxFreeMintCount[msg.sender],
+            mintCount < addressToMaxFreeMintCount[msg.sender] + 1,
             "Trying to mint more than allowed"
         );
 
+        addressToMintCount[msg.sender] = addressToMintCount[msg.sender] + count;
         (uint256 startIndex, uint256 endIndex) = supply.mint(count);
 
         for (uint256 i = startIndex; i < endIndex; i++) {
             _mint(msg.sender, i);
+        }
+    }
+
+    /**
+     * Airdrop tokens to a specific address
+     * @param to address to send the token to
+     * @param count number of tokens to airdrop
+     */
+    function airdrop(address to, uint256 count) external onlyOwner {
+        require(addressToAirdrop[msg.sender] == false, "Already airdropped");
+        addressToAirdrop[msg.sender] = true;
+        (uint256 startIndex, uint256 endIndex) = supply.mint(count);
+        for (uint256 i = startIndex; i < endIndex; i++) {
+            _mint(to, i);
         }
     }
 
@@ -149,9 +171,9 @@ contract Genesis is ERC721Pausable, Ownable {
             verifyProof(nonce, whiteListMerkleTreeRoot, proof),
             "Address is not in the whitelist"
         );
+        require(addressToMintCount[msg.sender] < 1, "Already minted");
         require(msg.value >= price, "Not enough ETH");
-        uint256 mintCount = balanceOf(msg.sender);
-        require(mintCount < WHITELIST_MINT_COUNT, "Already minted");
+        addressToMintCount[msg.sender] = 1;
         (uint256 startIndex, ) = supply.mint(1);
         _mint(msg.sender, startIndex);
     }
