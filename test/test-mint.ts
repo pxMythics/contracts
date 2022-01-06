@@ -38,7 +38,9 @@ describe('Genesis full minting function', function () {
 
   it('Testing complete mint', async function () {
     console.log('Generating the random wallets...');
-    const totalWallet = 976;
+    const totalWallet = 6;
+    const freeMintCount = 15;
+    const freeMinterCount = 66;
     // 981 addresses because 10 tokens are reserved for gods and 10 for free minters (with 2 each)
     // We create a 971 addresses to test minting all the supply and making sure we do in fact run out of supply
     const minterWallets: Wallet[] = await createRandomWallets(
@@ -50,7 +52,10 @@ describe('Genesis full minting function', function () {
     );
 
     // Add free minters
-    const freeMinterWallets: Wallet[] = await createRandomWallets(10, funder);
+    const freeMinterWallets: Wallet[] = await createRandomWallets(
+      freeMinterCount,
+      funder,
+    );
     expect(await contract.totalSupply()).to.be.equal(
       constants.reservedGodsCount,
     );
@@ -61,7 +66,7 @@ describe('Genesis full minting function', function () {
     for (let i = 0; i < freeMinterWallets.length; i++) {
       await contract
         .connect(owner)
-        .addFreeMinter(freeMinterWallets[i].address, 2);
+        .addFreeMinter(freeMinterWallets[i].address, freeMintCount);
     }
 
     await generateSeed(
@@ -85,13 +90,12 @@ describe('Genesis full minting function', function () {
     }
 
     console.log('Minting free mints...');
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < freeMinterCount; i++) {
       const multipleFreeMintTx = await contract
         .connect(freeMinterWallets[i])
-        .freeMint(2);
+        .freeMint(freeMintCount);
       const multipleFreeMintReceipt = await multipleFreeMintTx.wait();
-      // 10 reserved, i * 2 because each free mint has 2.
-      let freeMintIndex = constants.reservedGodsCount + i * 2;
+      let freeMintIndex = constants.reservedGodsCount + i * freeMintCount;
       for (const event of multipleFreeMintReceipt.events || []) {
         if (event.event === 'Transfer') {
           expect(event.args![2].toNumber()).to.equal(freeMintIndex);
@@ -99,7 +103,7 @@ describe('Genesis full minting function', function () {
         }
       }
       expect(await contract.totalSupply()).to.be.equal(
-        constants.reservedGodsCount + (i + 1) * 2,
+        constants.reservedGodsCount + (i + 1) * freeMintCount,
       );
     }
 
@@ -121,16 +125,15 @@ describe('Genesis full minting function', function () {
         .withArgs(
           addressZero,
           minterWallets[i].address,
-          i + constants.reservedGodsCount + 20,
+          i + constants.reservedGodsCount + freeMinterCount * freeMintCount,
         );
 
       expect(await contract.totalSupply()).to.be.equal(
-        constants.reservedGodsCount + 20 + i + 1,
+        constants.reservedGodsCount + freeMinterCount * freeMintCount + i + 1,
       );
     }
-
-    console.log('Minting over the limit...');
     expect(await contract.totalSupply()).to.be.equal(1001);
+    console.log('Minting over the limit...');
     await expect(
       contract
         .connect(minterWallets[totalWallet - 1])

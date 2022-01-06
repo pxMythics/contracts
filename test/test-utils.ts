@@ -87,7 +87,7 @@ export const createRandomWallet = async (
   const sendFundsTx = {
     from: funder.address,
     to: wallet.address,
-    value: ethers.utils.parseEther('0.5'),
+    value: ethers.utils.parseEther('1'),
   };
 
   await funder.sendTransaction(sendFundsTx);
