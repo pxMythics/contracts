@@ -29,7 +29,6 @@ const {
  * @type import('hardhat/config').HardhatUserConfig
  */
 
-// TODO Adjust for real deployment
 module.exports = {
   solidity: {
     compilers: [
