@@ -1,7 +1,9 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interfaces/State.sol";
 
-contract GenesisSupply {
+contract GenesisSupply is Ownable, State {
     enum TokenType {
         NONE,
         GOD,
@@ -19,13 +21,6 @@ contract GenesisSupply {
         MAGMA,
         METAL,
         WATER
-    }
-
-    enum MintState {
-        Closed,
-        Active,
-        Maintenance,
-        Finalized
     }
 
     struct TokenTraits {
@@ -69,12 +64,10 @@ contract GenesisSupply {
     /**
      * Utils
      */
-    MintState public mintState = MintState.Closed;
     bool public isRevealed;
     address private genesisAddress;
 
-    constructor(address _genesisAddress) {
-        genesisAddress = _genesisAddress;
+    constructor() {
         isRevealed = false;
         // reserve 6 gods for owner
         for (uint256 i = 0; i < RESERVED_GODS_MAX_SUPPLY; i++) {
@@ -91,9 +84,8 @@ contract GenesisSupply {
         isRevealed = _isRevealed;
     }
 
-    function setMintState(MintState _mintState) external isGenesis {
-        require(mintState != MintState.Finalized, "Mint finalized");
-        mintState = _mintState;
+    function setGenesis(address _genesisAddress) external onlyOwner closed {
+        genesisAddress = _genesisAddress;
     }
 
     /**
@@ -164,8 +156,7 @@ contract GenesisSupply {
      * This function needs to be ran BEFORE the mint is opened to avoid
      * @param count number of gods to transfer
      */
-    function mintReservedGods(uint256 count) public isGenesis {
-        require(mintState == MintState.Closed, "Mint not closed");
+    function mintReservedGods(uint256 count) public isGenesis closed {
         uint256 nextIndex = reservedGodsTransfered;
         // Here we don't need to increment counter and god supply counter because we already do in the constructor
         // to not initialize the counters at 0

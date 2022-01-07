@@ -1,8 +1,9 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+import "./State.sol";
 
 // Supply ABI needed from Genesis Contract
-contract DeployedSupply {
+contract DeployedSupply is State {
     function setIsRevealed(bool _isRevealed) external {}
 
     function currentIndex() public view returns (uint256 index) {}

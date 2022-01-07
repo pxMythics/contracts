@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "./interfaces/GenesisSupplyInterface.sol";
+import "./interfaces/State.sol";
 
 contract OwnableDelegateProxy {}
 
@@ -15,14 +16,7 @@ contract ProxyRegistry {
     mapping(address => OwnableDelegateProxy) public proxies;
 }
 
-contract Genesis is ERC721Pausable, Ownable {
-    enum MintState {
-        Closed,
-        Active,
-        Maintenance,
-        Finalized
-    }
-
+contract Genesis is ERC721Pausable, Ownable, State {
     struct Airdrop {
         address to;
         uint256 count;
@@ -34,7 +28,6 @@ contract Genesis is ERC721Pausable, Ownable {
     uint256 public constant WHITELIST_MINT_COUNT = 1;
     uint256 public price;
     string public baseTokenURI;
-    MintState public mintState = MintState.Closed;
     mapping(address => bool) private addressToMint;
 
     /**
@@ -92,8 +85,8 @@ contract Genesis is ERC721Pausable, Ownable {
     }
 
     function setMintState(MintState _mintState) external onlyOwner {
-        require(mintState != MintState.Finalized, "Mint finalized");
-        mintState = _mintState;
+        this._setMintState(_mintState);
+        supply._setMintState(_mintState);
     }
 
     function tokenURI(uint256 tokenId)
@@ -124,7 +117,12 @@ contract Genesis is ERC721Pausable, Ownable {
      * Airdrop tokens to an array of address
      * @param airdrops list of people to airdrop to
      */
-    function airdrop(Airdrop[] calldata airdrops) external onlyOwner closed {
+    function airdrop(Airdrop[] calldata airdrops)
+        external
+        onlyOwner
+        whenNotPaused
+        closed
+    {
         for (uint256 index = 0; index < airdrops.length; index++) {
             (uint256 startIndex, uint256 endIndex) = supply.mint(
                 airdrops[index].count
@@ -161,7 +159,12 @@ contract Genesis is ERC721Pausable, Ownable {
      * Function to mint the reserved gods
      * @param count number of gods to mint from the reserved pool
      */
-    function mintReservedGods(uint256 count) external onlyOwner closed {
+    function mintReservedGods(uint256 count)
+        external
+        onlyOwner
+        whenNotPaused
+        closed
+    {
         (uint256 startingIndex, uint256 maxSupply) = supply
             .reservedGodsCurrentIndexAndSupply();
         require(
@@ -231,25 +234,5 @@ contract Genesis is ERC721Pausable, Ownable {
         }
 
         return super.isApprovedForAll(owner, operator);
-    }
-
-    /**
-     *  Modifiers
-     */
-
-    /**
-     * Modifier that checks mint state to be closed
-     */
-    modifier closed() {
-        require(mintState == MintState.Closed, "Mint not closed");
-        _;
-    }
-
-    /**
-     * Modifier that checks mint state to be active
-     */
-    modifier active() {
-        require(mintState == MintState.Active, "Mint not active");
-        _;
     }
 }
