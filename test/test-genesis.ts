@@ -57,7 +57,6 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
   this.timeout(5000000);
 
   describe('Genesis Contract', () => {
-    // TODO Adjust with real values
     it('Should initialize the Genesis contract', async () => {
       expect(await contract.price()).to.equal(
         utils.parseEther(constants.mintPrice),

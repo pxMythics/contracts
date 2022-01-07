@@ -44,7 +44,6 @@ export const createRandomWallet = async (
   funder: SignerWithAddress,
 ): Promise<Wallet> => {
   let wallet = ethers.Wallet.createRandom();
-  // TODO: Validate if needed
   wallet = wallet.connect(funder.provider!);
   const sendFundsTx = {
     from: funder.address,
@@ -72,14 +71,15 @@ export interface Airdrop {
   count: number;
 }
 
-export const getAirdropData = async (airdrops: Airdrop[]) =>
+export const getAirdropData = (airdrops: Airdrop[]) =>
   airdrops.map((airdrop) => [airdrop.to, airdrop.count]);
 
 export const generateAirdroppedWallet = async (
   wallets: Wallet[],
+  count: number = Math.floor(Math.random() * 2) + 1,
 ): Promise<Airdrop[]> => {
   return wallets.map((wallet) => ({
     to: wallet.address,
-    count: Math.floor(Math.random() * 2) + 1,
+    count: count,
   }));
 };
