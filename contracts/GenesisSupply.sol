@@ -31,13 +31,13 @@ contract GenesisSupply is Ownable, State {
     /**
      * Supply
      */
-    uint256 public constant MAX_SUPPLY = 1001;
+    uint256 public constant MAX_SUPPLY = 1077;
     uint256 public constant GODS_MAX_SUPPLY = 51;
-    uint256 public constant DEMI_GODS_MAX_SUPPLY = 400;
-    uint256 public constant DEMI_GODS_SUBTYPE_MAX_SUPPLY = 200;
-    uint256 public constant ELEMENTALS_MAX_SUPPLY = 550;
-    uint256 public constant ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY = 100;
-    uint256 public constant ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY = 50;
+    uint256 public constant DEMI_GODS_MAX_SUPPLY = 424;
+    uint256 public constant DEMI_GODS_SUBTYPE_MAX_SUPPLY = 212;
+    uint256 public constant ELEMENTALS_MAX_SUPPLY = 602;
+    uint256 public constant ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY = 110;
+    uint256 public constant ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY = 54;
     uint256 public constant RESERVED_GODS_MAX_SUPPLY = 6;
 
     /**
@@ -180,7 +180,10 @@ contract GenesisSupply is Ownable, State {
         view
         returns (uint256 randomNumber)
     {
-        return uint256(keccak256(abi.encodePacked(msg.sender, nonce)));
+        return
+            uint256(
+                keccak256(abi.encodePacked(msg.sender, block.timestamp, nonce))
+            );
     }
 
     /**
