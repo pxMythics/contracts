@@ -89,6 +89,7 @@ contract GenesisSupply is Ownable, State {
     }
 
     function setMintState(MintState _mintState) external isGenesis {
+        require(_mintState > mintState, "State can't go back");
         mintState = _mintState;
     }
 

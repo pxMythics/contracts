@@ -93,7 +93,8 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           contract.mintWhitelist(whiteListNonce, whiteListProof),
         ).to.be.revertedWith('Mint not active');
 
-        // Should not allow if tree rootnot set
+        // Should not allow if tree root not set
+        await supplyContract.setGenesis(contract.address);
         await contract.connect(owner).setMintState(1);
         await expect(
           contract
@@ -102,16 +103,17 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         ).to.be.revertedWith('Address is not in the whitelist');
 
         // Should not allow if genesis not set
-        await contract
-          .connect(owner)
-          .setWhiteListMerkleTreeRoot(whiteListMerkleTreeRoot);
-        await expect(
-          contract
-            .connect(whitelisted)
-            .mintWhitelist(whiteListNonce, whiteListProof, {
-              value: ethers.utils.parseEther(constants.mintPrice),
-            }),
-        ).to.be.revertedWith('Not Genesis');
+        // This case can't happen with current flow
+        // await contract
+        //   .connect(owner)
+        //   .setWhiteListMerkleTreeRoot(whiteListMerkleTreeRoot);
+        // await expect(
+        //   contract
+        //     .connect(whitelisted)
+        //     .mintWhitelist(whiteListNonce, whiteListProof, {
+        //       value: ethers.utils.parseEther(constants.mintPrice),
+        //     }),
+        // ).to.be.revertedWith('Not Genesis');
       });
 
       it('Cannot airdrop', async function () {
@@ -145,6 +147,17 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
         await expect(
           contract.connect(owner).mintReservedGods(constants.reservedGodsCount),
         ).to.be.revertedWith('Not Genesis');
+
+        await expect(
+          contract.connect(owner).setMintState(1),
+        ).to.be.revertedWith('Not Genesis');
+      });
+
+      it('Cannot move state if genesis is not set', async function () {
+        await contract.connect(owner).unpause();
+        await expect(
+          contract.connect(owner).setMintState(1),
+        ).to.be.revertedWith('Not Genesis');
       });
     });
     describe('Contract properly setup', () => {
@@ -165,6 +178,30 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
                 value: ethers.utils.parseEther(constants.mintPrice),
               }),
           ).to.be.revertedWith('Mint not active');
+        });
+
+        it('Cannot move back on state machine', async function () {
+          await contract.connect(owner).setMintState(1);
+          await expect(
+            contract.connect(owner).setMintState(1),
+          ).to.be.revertedWith("State can't go back");
+          await expect(
+            contract.connect(owner).setMintState(0),
+          ).to.be.revertedWith("State can't go back");
+          await contract.connect(owner).setMintState(2);
+          await expect(
+            contract.connect(owner).setMintState(1),
+          ).to.be.revertedWith("State can't go back");
+          await expect(
+            contract.connect(owner).setMintState(2),
+          ).to.be.revertedWith("State can't go back");
+          await contract.connect(owner).setMintState(3);
+          await expect(
+            contract.connect(owner).setMintState(3),
+          ).to.be.revertedWith("State can't go back");
+          await expect(
+            contract.connect(owner).setMintState(2),
+          ).to.be.revertedWith("State can't go back");
         });
 
         it('Cannot set base URI', async function () {
@@ -392,6 +429,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
               }),
           ).to.be.revertedWith('Already minted');
         });
+
         it('Cannot mint if the user is not on the whitelist', async function () {
           await expect(
             contract
@@ -424,13 +462,58 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           expect(await contract.balanceOf(whitelisted.address)).to.equal(1);
         });
 
-        it('Cannot airdrop', async function () {
-          // Airdrop
-          const wallets = await createRandomWallets(1, funder);
-          const airdrops = await generateAirdroppedWallet(wallets);
+        it('Can airdrop tokens to a whitelist and whitelist can mint after', async function () {
+          const airdrops = [{ to: whitelisted.address, count: 2 }];
+          const airdropsTx = await contract.connect(owner).airdrop(airdrops);
+          const airdropsReceipts = await airdropsTx.wait();
+          let freeMintIndex = constants.reservedGodsCount;
+          for (const event of airdropsReceipts.events || []) {
+            if (event.event === 'Transfer') {
+              expect(event.args![2].toNumber()).to.equal(freeMintIndex);
+              freeMintIndex++;
+            }
+          }
+          for (const airdrop of airdrops) {
+            expect(await contract.balanceOf(airdrop.to)).to.be.equal(
+              airdrop.count,
+            );
+          }
           await expect(
-            contract.connect(owner).airdrop(airdrops),
-          ).to.be.revertedWith('Mint not closed');
+            contract
+              .connect(whitelisted)
+              .mintWhitelist(whiteListNonce, whiteListProof, {
+                value: ethers.utils.parseEther(constants.mintPrice),
+              }),
+          )
+            .to.emit(contract, 'Transfer')
+            .withArgs(
+              addressZero,
+              whitelisted.address,
+              constants.reservedGodsCount + 2,
+            );
+          expect(await contract.balanceOf(whitelisted.address)).to.equal(3);
+        });
+
+        it('Can airdrop tokens to random wallets', async function () {
+          const wallets = await createRandomWallets(
+            constants.numberOfWalletsToAirdrop,
+            funder,
+          );
+          const airdrops = await generateAirdroppedWallet(wallets);
+          const airdropsTx = await contract.connect(owner).airdrop(airdrops);
+          const airdropsReceipts = await airdropsTx.wait();
+          let freeMintIndex = constants.reservedGodsCount;
+          for (const event of airdropsReceipts.events || []) {
+            if (event.event === 'Transfer') {
+              expect(event.args![2].toNumber()).to.equal(freeMintIndex);
+              freeMintIndex++;
+            }
+          }
+          for (const airdrop of airdrops) {
+            expect(await contract.balanceOf(airdrop.to)).to.be.equal(
+              airdrop.count,
+            );
+          }
         });
 
         it('Cannot mint reserved', async function () {
@@ -460,7 +543,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
           const airdrops = await generateAirdroppedWallet(wallets);
           await expect(
             contract.connect(owner).airdrop(airdrops),
-          ).to.be.revertedWith('Mint not closed');
+          ).to.be.revertedWith('Not closed or active');
         });
 
         it('Cannot mint reserved', async function () {
@@ -485,17 +568,12 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
             contract.connect(owner).setBaseURI(constants.revealedURI),
           ).to.be.revertedWith('Mint not maintenance');
         });
-        it('Cannot set re-change state', async function () {
-          await expect(
-            contract.connect(owner).setMintState(2),
-          ).to.be.revertedWith('Mint finalized');
-        });
         it('Cannot airdrop', async function () {
           const wallets = await createRandomWallets(1, funder);
           const airdrops = await generateAirdroppedWallet(wallets);
           await expect(
             contract.connect(owner).airdrop(airdrops),
-          ).to.be.revertedWith('Mint not closed');
+          ).to.be.revertedWith('Not closed or active');
         });
 
         it('Cannot mint reserved', async function () {
@@ -541,6 +619,17 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       expect(returnValue[0]).to.equal(0);
     });
 
+    it('Only Genesis can change state', async function () {
+      const genesisState = await contract.mintState();
+      expect(await supplyContract.mintState()).to.equal(genesisState);
+      await expect(supplyContract.setMintState(1)).to.be.revertedWith(
+        'Not Genesis',
+      );
+      await expect(
+        supplyContract.connect(funder).setMintState(1),
+      ).to.be.revertedWith('Not Genesis');
+    });
+
     it('State follows Genesis state', async function () {
       let genesisState = await contract.mintState();
       expect(await supplyContract.mintState()).to.equal(genesisState);
@@ -568,7 +657,9 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
       await contract.setMintState(2);
       await contract.connect(owner).setBaseURI(constants.revealedURI);
       await expect(
-        supplyContract.connect(contract.address).getMetadataForTokenId(1001),
+        supplyContract
+          .connect(contract.address)
+          .getMetadataForTokenId(constants.totalSupply),
       ).to.be.revertedWith('Invalid tokenId');
       await expect(
         supplyContract.connect(contract.address).getMetadataForTokenId(4000),
@@ -578,7 +669,7 @@ describe('Genesis Contract and GenesisSupply Contract', function () {
     it('Metadata is returned if trying to access a valid token id and collection is revealed', async function () {
       contract.connect(owner).mintReservedGods(constants.reservedGodsCount);
       // Airdrop 50, we should expect one to not be a god (there's 50 gods and 6 are reserved)
-      const wallets = await createRandomWallets(50, funder);
+      const wallets = await createRandomWallets(25, funder);
       const airdrops = await generateAirdroppedWallet(wallets);
       const totalAirdropCount = airdrops.reduce((a, b) => a + b.count, 0);
       await contract.connect(owner).airdrop(airdrops);

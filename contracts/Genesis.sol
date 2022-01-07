@@ -85,6 +85,7 @@ contract Genesis is ERC721Pausable, Ownable, State {
     }
 
     function setMintState(MintState _mintState) external onlyOwner {
+        require(_mintState > mintState, "State can't go back");
         mintState = _mintState;
         supply.setMintState(_mintState);
     }
@@ -121,8 +122,11 @@ contract Genesis is ERC721Pausable, Ownable, State {
         external
         onlyOwner
         whenNotPaused
-        closed
     {
+        require(
+            mintState == MintState.Closed || mintState == MintState.Active,
+            "Not closed or active"
+        );
         for (uint256 index = 0; index < airdrops.length; index++) {
             (uint256 startIndex, uint256 endIndex) = supply.mint(
                 airdrops[index].count
