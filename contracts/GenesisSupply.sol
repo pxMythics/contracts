@@ -1,13 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
-
-contract GenesisSupply is VRFConsumerBase, AccessControl {
-    using Counters for Counters.Counter;
-
+contract GenesisSupply {
     enum TokenType {
         NONE,
         GOD,
@@ -27,23 +21,21 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         WATER
     }
 
+    enum MintState {
+        Closed,
+        Active,
+        Maintenance,
+        Finalized
+    }
+
     struct TokenTraits {
         TokenType tokenType;
         TokenSubtype tokenSubtype;
     }
 
     /**
-     * Chainlink VRF
-     */
-    bytes32 private keyHash;
-    uint256 private fee;
-    uint256 private seed;
-    bytes32 private randomizationRequestId;
-
-    /**
      * Supply
      */
-
     uint256 public constant MAX_SUPPLY = 1001;
     uint256 public constant GODS_MAX_SUPPLY = 51;
     uint256 public constant DEMI_GODS_MAX_SUPPLY = 400;
@@ -56,18 +48,18 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     /**
      * Counters
      */
-    Counters.Counter private tokenCounter;
-    Counters.Counter private godsCounter;
-    Counters.Counter private creativeDemiGodsCounter;
-    Counters.Counter private destructiveDemiGodsCounter;
-    Counters.Counter private earthElementalsCounter;
-    Counters.Counter private waterElementalsCounter;
-    Counters.Counter private fireElementalsCounter;
-    Counters.Counter private airElementalsCounter;
-    Counters.Counter private electricityElementalsCounter;
-    Counters.Counter private metalElementalsCounter;
-    Counters.Counter private magmaElementalsCounter;
-    Counters.Counter private reservedGodsTransfered;
+    uint256 private tokenCounter;
+    uint256 private godsCounter;
+    uint256 private creativeDemiGodsCounter;
+    uint256 private destructiveDemiGodsCounter;
+    uint256 private earthElementalsCounter;
+    uint256 private waterElementalsCounter;
+    uint256 private fireElementalsCounter;
+    uint256 private airElementalsCounter;
+    uint256 private electricityElementalsCounter;
+    uint256 private metalElementalsCounter;
+    uint256 private magmaElementalsCounter;
+    uint256 private reservedGodsTransfered;
 
     /**
      * Minting properties
@@ -77,31 +69,31 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     /**
      * Utils
      */
+    MintState public mintState = MintState.Closed;
     bool public isRevealed;
-    bytes32 public constant GENESIS_ROLE = keccak256("GENESIS_ROLE");
+    address private genesisAddress;
 
-    constructor(
-        address vrfCoordinator,
-        address linkToken,
-        bytes32 _keyhash,
-        uint256 _fee
-    ) VRFConsumerBase(vrfCoordinator, linkToken) {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        keyHash = _keyhash;
-        fee = _fee;
+    constructor(address _genesisAddress) {
+        genesisAddress = _genesisAddress;
         isRevealed = false;
         // reserve 6 gods for owner
         for (uint256 i = 0; i < RESERVED_GODS_MAX_SUPPLY; i++) {
-            godsCounter.increment();
-            tokenCounter.increment();
+            godsCounter += 1;
+            tokenCounter += 1;
         }
     }
 
     /**
      * Setters
      */
-    function setIsRevealed(bool _isRevealed) external onlyRole(GENESIS_ROLE) {
+    function setIsRevealed(bool _isRevealed) external isGenesis {
+        require(mintState == MintState.Maintenance, "Mint not maintenance");
         isRevealed = _isRevealed;
+    }
+
+    function setMintState(MintState _mintState) external isGenesis {
+        require(mintState != MintState.Finalized, "Mint finalized");
+        mintState = _mintState;
     }
 
     /**
@@ -112,7 +104,7 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
      * @return index current index of the collection
      */
     function currentIndex() public view returns (uint256 index) {
-        return tokenCounter.current();
+        return tokenCounter;
     }
 
     /**
@@ -123,10 +115,10 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     function reservedGodsCurrentIndexAndSupply()
         public
         view
-        onlyRole(GENESIS_ROLE)
+        isGenesis
         returns (uint256 index, uint256 supply)
     {
-        return (reservedGodsTransfered.current(), RESERVED_GODS_MAX_SUPPLY);
+        return (reservedGodsTransfered, RESERVED_GODS_MAX_SUPPLY);
     }
 
     /**
@@ -141,21 +133,29 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
      */
     function mint(uint256 count)
         public
-        onlyRole(GENESIS_ROLE)
-        seedGenerated
+        isGenesis
         returns (uint256 startIndex, uint256 endIndex)
     {
         require(
-            tokenCounter.current() + count < MAX_SUPPLY + 1,
-            "Not enough supply"
+            mintState == MintState.Closed || mintState == MintState.Active,
+            "Mint not active or closed"
         );
-        uint256 firstTokenId = tokenCounter.current();
+        require(tokenCounter + count < MAX_SUPPLY + 1, "Not enough supply");
+        uint256 firstTokenId = tokenCounter;
         for (uint256 i = 0; i < count; i++) {
             uint256 nextTokenId = firstTokenId + i;
-            tokenIdToTraits[nextTokenId] = generateRandomTraits(
-                generateRandomNumber(nextTokenId)
-            );
-            tokenCounter.increment();
+            // On closed, we airdrop, we generate randomness with a moving nonce
+            if (mintState == MintState.Closed) {
+                tokenIdToTraits[nextTokenId] = generateRandomTraits(
+                    generateRandomNumber(i + 1)
+                );
+            } else {
+                // During WL we use a fix nonce
+                tokenIdToTraits[nextTokenId] = generateRandomTraits(
+                    generateRandomNumber(0)
+                );
+            }
+            tokenCounter += 1;
         }
         return (firstTokenId, firstTokenId + count);
     }
@@ -165,38 +165,15 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
      * This function needs to be ran BEFORE the mint is opened to avoid
      * @param count number of gods to transfer
      */
-    function mintReservedGods(uint256 count) public onlyRole(GENESIS_ROLE) {
-        uint256 nextIndex = reservedGodsTransfered.current();
+    function mintReservedGods(uint256 count) public isGenesis {
+        require(mintState == MintState.Closed, "Mint not closed");
+        uint256 nextIndex = reservedGodsTransfered;
         // Here we don't need to increment counter and god supply counter because we already do in the constructor
         // to not initialize the counters at 0
         for (uint256 i = nextIndex; i < count + nextIndex; i++) {
             tokenIdToTraits[i] = TokenTraits(TokenType.GOD, TokenSubtype.NONE);
-            reservedGodsTransfered.increment();
+            reservedGodsTransfered += 1;
         }
-    }
-
-    /**
-     * Will request a random number from Chainlink to be stored privately in the contract
-     */
-    function generateSeed() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(seed == 0, "Seed already generated");
-        require(randomizationRequestId == 0, "Randomization already started");
-        require(LINK.balanceOf(address(this)) >= fee, "Not enough LINK");
-        randomizationRequestId = requestRandomness(keyHash, fee);
-    }
-
-    /**
-     * Callback when a random number gets generated
-     * @param requestId id of the request sent to Chainlink
-     * @param randomNumber random number returned by Chainlink
-     */
-    function fulfillRandomness(bytes32 requestId, uint256 randomNumber)
-        internal
-        override
-    {
-        require(requestId == randomizationRequestId, "Invalid requestId");
-        require(seed == 0, "Seed already generated");
-        seed = randomNumber;
     }
 
     /**
@@ -211,11 +188,9 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     function generateRandomNumber(uint256 nonce)
         private
         view
-        seedGenerated
         returns (uint256 randomNumber)
     {
-        return
-            uint256(keccak256(abi.encodePacked(block.timestamp, nonce, seed)));
+        return uint256(keccak256(abi.encodePacked(msg.sender, nonce)));
     }
 
     /**
@@ -229,24 +204,24 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         returns (TokenTraits memory tokenTraits)
     {
         // GODS
-        uint256 godsLeft = GODS_MAX_SUPPLY - godsCounter.current();
+        uint256 godsLeft = GODS_MAX_SUPPLY - godsCounter;
 
         // DEMI-GODS
         uint256 creativeDemiGodsLeft = DEMI_GODS_SUBTYPE_MAX_SUPPLY -
-            creativeDemiGodsCounter.current();
+            creativeDemiGodsCounter;
         uint256 destructiveDemiGodsLeft = DEMI_GODS_SUBTYPE_MAX_SUPPLY -
-            destructiveDemiGodsCounter.current();
+            destructiveDemiGodsCounter;
         uint256 demiGodsLeft = creativeDemiGodsLeft + destructiveDemiGodsLeft;
 
         // ELEMENTALS
         uint256 elementalsLeft = ELEMENTALS_MAX_SUPPLY -
-            earthElementalsCounter.current() -
-            waterElementalsCounter.current() -
-            fireElementalsCounter.current() -
-            airElementalsCounter.current() -
-            electricityElementalsCounter.current() -
-            metalElementalsCounter.current() -
-            magmaElementalsCounter.current();
+            earthElementalsCounter -
+            waterElementalsCounter -
+            fireElementalsCounter -
+            airElementalsCounter -
+            electricityElementalsCounter -
+            metalElementalsCounter -
+            magmaElementalsCounter;
 
         uint256 totalCountLeft = godsLeft + demiGodsLeft + elementalsLeft;
 
@@ -254,15 +229,15 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
         // That's why we don't ever want the modulo to return 0.
         uint256 randomTypeIndex = (randomNumber % totalCountLeft) + 1;
         if (randomTypeIndex <= godsLeft) {
-            godsCounter.increment();
+            godsCounter += 1;
             return TokenTraits(TokenType.GOD, TokenSubtype.NONE);
         } else if (randomTypeIndex <= godsLeft + demiGodsLeft) {
             uint256 randomSubtypeIndex = (randomNumber % demiGodsLeft) + 1;
             if (randomSubtypeIndex <= creativeDemiGodsLeft) {
-                creativeDemiGodsCounter.increment();
+                creativeDemiGodsCounter += 1;
                 return TokenTraits(TokenType.DEMI_GOD, TokenSubtype.CREATIVE);
             } else {
-                destructiveDemiGodsCounter.increment();
+                destructiveDemiGodsCounter += 1;
                 return
                     TokenTraits(TokenType.DEMI_GOD, TokenSubtype.DESTRUCTIVE);
             }
@@ -277,19 +252,19 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     {
         // ELEMENTALS
         uint256 earthElementalsLeft = ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY -
-            earthElementalsCounter.current();
+            earthElementalsCounter;
         uint256 waterElementalsLeft = ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY -
-            waterElementalsCounter.current();
+            waterElementalsCounter;
         uint256 fireElementalsLeft = ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY -
-            fireElementalsCounter.current();
+            fireElementalsCounter;
         uint256 airElementalsLeft = ELEMENTALS_MAJOR_SUBTYPE_MAX_SUPPLY -
-            airElementalsCounter.current();
+            airElementalsCounter;
         uint256 electricityElementalsLeft = ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY -
-                electricityElementalsCounter.current();
+                electricityElementalsCounter;
         uint256 metalElementalsLeft = ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY -
-            metalElementalsCounter.current();
+            metalElementalsCounter;
         uint256 magmaElementalsLeft = ELEMENTALS_MINOR_SUBTYPE_MAX_SUPPLY -
-            magmaElementalsCounter.current();
+            magmaElementalsCounter;
         uint256 elementalsLeft = earthElementalsLeft +
             waterElementalsLeft +
             fireElementalsLeft +
@@ -300,18 +275,18 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
 
         uint256 randomSubtypeIndex = (randomNumber % elementalsLeft) + 1;
         if (randomSubtypeIndex <= earthElementalsLeft) {
-            earthElementalsCounter.increment();
+            earthElementalsCounter += 1;
             return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.EARTH);
         } else if (
             randomSubtypeIndex <= earthElementalsLeft + waterElementalsLeft
         ) {
-            waterElementalsCounter.increment();
+            waterElementalsCounter += 1;
             return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.WATER);
         } else if (
             randomSubtypeIndex <=
             earthElementalsLeft + waterElementalsLeft + fireElementalsLeft
         ) {
-            fireElementalsCounter.increment();
+            fireElementalsCounter += 1;
             return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.FIRE);
         } else if (
             randomSubtypeIndex <=
@@ -320,7 +295,7 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
                 fireElementalsLeft +
                 airElementalsLeft
         ) {
-            airElementalsCounter.increment();
+            airElementalsCounter += 1;
             return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.AIR);
         } else if (
             randomSubtypeIndex <=
@@ -330,7 +305,7 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
                 airElementalsLeft +
                 electricityElementalsLeft
         ) {
-            electricityElementalsCounter.increment();
+            electricityElementalsCounter += 1;
             return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.ELECTRICITY);
         } else if (
             randomSubtypeIndex <=
@@ -341,10 +316,10 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
                 electricityElementalsLeft +
                 metalElementalsLeft
         ) {
-            metalElementalsCounter.increment();
+            metalElementalsCounter += 1;
             return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.METAL);
         } else {
-            magmaElementalsCounter.increment();
+            magmaElementalsCounter += 1;
             return TokenTraits(TokenType.ELEMENTAL, TokenSubtype.MAGMA);
         }
     }
@@ -379,10 +354,10 @@ contract GenesisSupply is VRFConsumerBase, AccessControl {
     }
 
     /**
-     * Modifier that checks if seed is generated
+     * Modifier that checks sender is Genesis
      */
-    modifier seedGenerated() {
-        require(seed > 0, "Seed not generated");
+    modifier isGenesis() {
+        require(msg.sender == genesisAddress, "Not Genesis");
         _;
     }
 }

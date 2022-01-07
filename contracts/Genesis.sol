@@ -16,16 +16,26 @@ contract ProxyRegistry {
 }
 
 contract Genesis is ERC721Pausable, Ownable {
+    enum MintState {
+        Closed,
+        Active,
+        Maintenance,
+        Finalized
+    }
+
+    struct Airdrop {
+        address to;
+        uint256 count;
+    }
+
     /**
      * Mint parameters
      */
     uint256 public constant WHITELIST_MINT_COUNT = 1;
     uint256 public price;
-    string public unrevealedURI;
     string public baseTokenURI;
-    mapping(address => uint256) private addressToMaxFreeMintCount;
-    mapping(address => uint256) private addressToMintCount;
-    mapping(address => bool) private addressToAirdrop;
+    MintState public mintState = MintState.Closed;
+    mapping(address => bool) private addressToMint;
 
     /**
      * Merkle tree properties
@@ -37,12 +47,12 @@ contract Genesis is ERC721Pausable, Ownable {
 
     constructor(
         address _genesisSupplyAddress,
-        string memory _unrevealedURI,
+        string memory unrevealedURI,
         uint256 _price,
         address _proxyRegistryAddress
     ) ERC721("Mythics Genesis", "MGEN") {
         supply = DeployedSupply(_genesisSupplyAddress);
-        unrevealedURI = _unrevealedURI;
+        baseTokenURI = unrevealedURI;
         price = _price;
         proxyRegistryAddress = _proxyRegistryAddress;
         _pause();
@@ -53,10 +63,6 @@ contract Genesis is ERC721Pausable, Ownable {
      */
     function _baseURI() internal view virtual override returns (string memory) {
         return baseTokenURI;
-    }
-
-    function isRevealed() internal view returns (bool revealed) {
-        return bytes(baseTokenURI).length > 0;
     }
 
     function contractURI() public pure returns (string memory) {
@@ -72,6 +78,7 @@ contract Genesis is ERC721Pausable, Ownable {
      * Setters
      */
     function setBaseURI(string memory _baseTokenURI) external onlyOwner {
+        require(mintState == MintState.Maintenance, "Mint not maintenance");
         // Set in Supply contract for the `getMetadataForTokenId` function
         supply.setIsRevealed(true);
         baseTokenURI = _baseTokenURI;
@@ -84,8 +91,9 @@ contract Genesis is ERC721Pausable, Ownable {
         whiteListMerkleTreeRoot = _whiteListMerkleTreeRoot;
     }
 
-    function setUnrevealedURI(string memory _unrevealedUri) external onlyOwner {
-        unrevealedURI = _unrevealedUri;
+    function setMintState(MintState _mintState) external onlyOwner {
+        require(mintState != MintState.Finalized, "Mint finalized");
+        mintState = _mintState;
     }
 
     function tokenURI(uint256 tokenId)
@@ -94,9 +102,6 @@ contract Genesis is ERC721Pausable, Ownable {
         override
         returns (string memory)
     {
-        if (!isRevealed()) {
-            return unrevealedURI;
-        }
         return
             string(abi.encodePacked(baseTokenURI, Strings.toString(tokenId)));
     }
@@ -116,44 +121,17 @@ contract Genesis is ERC721Pausable, Ownable {
     }
 
     /**
-     * Free mint
-     * @param count number of tokens to mint
+     * Airdrop tokens to an array of address
+     * @param airdrops list of people to airdrop to
      */
-    function freeMint(uint256 count) external whenNotPaused {
-        require(
-            addressToMintCount[msg.sender] <
-                addressToMaxFreeMintCount[msg.sender],
-            "Already minted"
-        );
-        require(
-            addressToMaxFreeMintCount[msg.sender] > 0,
-            "Address is not in the free mint list"
-        );
-        uint256 mintCount = addressToMintCount[msg.sender] + count;
-        require(
-            mintCount < addressToMaxFreeMintCount[msg.sender] + 1,
-            "Trying to mint more than allowed"
-        );
-
-        addressToMintCount[msg.sender] = addressToMintCount[msg.sender] + count;
-        (uint256 startIndex, uint256 endIndex) = supply.mint(count);
-
-        for (uint256 i = startIndex; i < endIndex; i++) {
-            _mint(msg.sender, i);
-        }
-    }
-
-    /**
-     * Airdrop tokens to a specific address
-     * @param to address to send the token to
-     * @param count number of tokens to airdrop
-     */
-    function airdrop(address to, uint256 count) external onlyOwner {
-        require(addressToAirdrop[msg.sender] == false, "Already airdropped");
-        addressToAirdrop[msg.sender] = true;
-        (uint256 startIndex, uint256 endIndex) = supply.mint(count);
-        for (uint256 i = startIndex; i < endIndex; i++) {
-            _mint(to, i);
+    function airdrop(Airdrop[] calldata airdrops) external onlyOwner closed {
+        for (uint256 index = 0; index < airdrops.length; index++) {
+            (uint256 startIndex, uint256 endIndex) = supply.mint(
+                airdrops[index].count
+            );
+            for (uint256 i = startIndex; i < endIndex; i++) {
+                _mint(airdrops[index].to, i);
+            }
         }
     }
 
@@ -166,14 +144,15 @@ contract Genesis is ERC721Pausable, Ownable {
         external
         payable
         whenNotPaused
+        active
     {
         require(
             verifyProof(nonce, whiteListMerkleTreeRoot, proof),
             "Address is not in the whitelist"
         );
-        require(addressToMintCount[msg.sender] < 1, "Already minted");
-        require(msg.value >= price, "Not enough ETH");
-        addressToMintCount[msg.sender] = 1;
+        require(addressToMint[msg.sender] == false, "Already minted");
+        require(msg.value == price, "Not enough ETH");
+        addressToMint[msg.sender] = true;
         (uint256 startIndex, ) = supply.mint(1);
         _mint(msg.sender, startIndex);
     }
@@ -182,7 +161,7 @@ contract Genesis is ERC721Pausable, Ownable {
      * Function to mint the reserved gods
      * @param count number of gods to mint from the reserved pool
      */
-    function mintReservedGods(uint256 count) external onlyOwner {
+    function mintReservedGods(uint256 count) external onlyOwner closed {
         (uint256 startingIndex, uint256 maxSupply) = supply
             .reservedGodsCurrentIndexAndSupply();
         require(
@@ -194,16 +173,6 @@ contract Genesis is ERC721Pausable, Ownable {
         for (uint256 i = startingIndex; i < count + startingIndex; i++) {
             _mint(msg.sender, i);
         }
-    }
-
-    /**
-     * Add an address to the free mint count
-     * @param to address of free minter
-     * @param maxCount max free mint allowed for address
-     */
-    function addFreeMinter(address to, uint256 maxCount) external onlyOwner {
-        require(addressToMaxFreeMintCount[to] == 0, "Already added");
-        addressToMaxFreeMintCount[to] = maxCount;
     }
 
     /**
@@ -262,5 +231,25 @@ contract Genesis is ERC721Pausable, Ownable {
         }
 
         return super.isApprovedForAll(owner, operator);
+    }
+
+    /**
+     *  Modifiers
+     */
+
+    /**
+     * Modifier that checks mint state to be closed
+     */
+    modifier closed() {
+        require(mintState == MintState.Closed, "Mint not closed");
+        _;
+    }
+
+    /**
+     * Modifier that checks mint state to be active
+     */
+    modifier active() {
+        require(mintState == MintState.Active, "Mint not active");
+        _;
     }
 }
