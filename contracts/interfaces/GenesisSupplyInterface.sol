@@ -4,6 +4,8 @@ import "./State.sol";
 
 // Supply ABI needed from Genesis Contract
 contract DeployedSupply is State {
+    function setMintState(MintState _mintState) external {}
+
     function setIsRevealed(bool _isRevealed) external {}
 
     function currentIndex() public view returns (uint256 index) {}

@@ -10,11 +10,6 @@ abstract contract State {
     }
     MintState public mintState = MintState.Closed;
 
-    function _setMintState(MintState _mintState) external {
-        require(mintState != MintState.Finalized, "Mint finalized");
-        mintState = _mintState;
-    }
-
     /**
      * Modifier that checks mint state to be closed
      */

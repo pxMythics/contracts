@@ -88,6 +88,10 @@ contract GenesisSupply is Ownable, State {
         genesisAddress = _genesisAddress;
     }
 
+    function setMintState(MintState _mintState) external isGenesis {
+        mintState = _mintState;
+    }
+
     /**
      * Getters
      */

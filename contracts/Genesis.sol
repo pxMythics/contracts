@@ -85,8 +85,8 @@ contract Genesis is ERC721Pausable, Ownable, State {
     }
 
     function setMintState(MintState _mintState) external onlyOwner {
-        this._setMintState(_mintState);
-        supply._setMintState(_mintState);
+        mintState = _mintState;
+        supply.setMintState(_mintState);
     }
 
     function tokenURI(uint256 tokenId)
