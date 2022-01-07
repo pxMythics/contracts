@@ -143,15 +143,14 @@ contract GenesisSupply {
         require(tokenCounter + count < MAX_SUPPLY + 1, "Not enough supply");
         uint256 firstTokenId = tokenCounter;
         for (uint256 i = 0; i < count; i++) {
-            uint256 nextTokenId = firstTokenId + i;
             // On closed, we airdrop, we generate randomness with a moving nonce
             if (mintState == MintState.Closed) {
-                tokenIdToTraits[nextTokenId] = generateRandomTraits(
-                    generateRandomNumber(i + 1)
+                tokenIdToTraits[firstTokenId + i] = generateRandomTraits(
+                    generateRandomNumber(tokenCounter)
                 );
             } else {
                 // During WL we use a fix nonce
-                tokenIdToTraits[nextTokenId] = generateRandomTraits(
+                tokenIdToTraits[firstTokenId + i] = generateRandomTraits(
                     generateRandomNumber(0)
                 );
             }
