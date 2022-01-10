@@ -1,7 +1,7 @@
 import { networkConfig } from '../helper-hardhat-config';
 
 module.exports = [
-  '0xbf0879e16230c31A13aa6669cb68b62CC96a0BDA',
+  '0x4D6A46de0a003147a1e0E7b4f87C33CAFADF7AE0',
   networkConfig[4].unrevealedURI,
   networkConfig[4].mintPrice,
   networkConfig[4].openSeaProxyAddress,

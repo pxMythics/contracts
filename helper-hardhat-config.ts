@@ -29,10 +29,9 @@ export const networkConfig: networkConfigInfo = {
     openSeaProxyAddress: '0xf57b2c51ded3a29e6891aba85459d600256cf317',
   },
   1: {
-    // TODO Update with valid URI
     name: 'mainnet',
     mintPrice: '77000000000000000',
-    unrevealedURI: 'ipfs://Qmf28aAuBptYHtVE9pDoU9sPtFV4U898zTsBuMjBxFXYKQ/',
+    unrevealedURI: 'ipfs://Qmb4UCSNMuDz5sNk3Ngh2kkBkUzNcrYnNGKckZQ4CrJ2kE/',
     openSeaProxyAddress: '0xa5409ec958c83c3f309868babaca7c86dcb077c1',
   },
   4: {
