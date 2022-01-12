@@ -1,8 +1,6 @@
 import '@nomiclabs/hardhat-web3';
-import { ContractReceipt } from 'ethers';
-import { subtask, task } from 'hardhat/config';
+import { task } from 'hardhat/config';
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
-import { constants } from '../test/constants';
 import airdrop1 from './data/airdrop-2.json';
 
 const genesisAddress = '0x12c63bbD266dB84e117356e664f3604055166CEc';

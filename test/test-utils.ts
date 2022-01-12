@@ -1,8 +1,8 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { Wallet } from 'ethers';
+import { ContractReceipt, Wallet } from 'ethers';
 import { deployments, ethers } from 'hardhat';
 import { Deployment } from 'hardhat-deploy/dist/types';
-import { Genesis, GenesisSupply } from '../typechain';
+import { Genesis, GenesisSupply, LinkToken, GenesisReveal } from '../typechain';
 import { constants } from './constants';
 
 export const deployTestContract = async (
@@ -12,16 +12,16 @@ export const deployTestContract = async (
   supplyContract: GenesisSupply;
 }> => {
   await deployments.fixture(['Genesis']);
-  const GenesisDeployment: Deployment = await deployments.get('Genesis');
   const signers = await ethers.getSigners();
   const owner = signers[9];
+
+  const GenesisDeployment: Deployment = await deployments.get('Genesis');
   const Genesis = await ethers.getContractAt(
     'Genesis',
     GenesisDeployment.address,
     owner,
   );
 
-  // Set the Genesis contract the proper role on the Supply contract
   const GenesisSupplyDeployment: Deployment = await deployments.get(
     'GenesisSupply',
   );
@@ -34,6 +34,34 @@ export const deployTestContract = async (
   return {
     contract: Genesis,
     supplyContract: GenesisSupply,
+  };
+};
+
+export const deployShuffler = async (): Promise<{
+  shuffler: GenesisReveal;
+  linkToken: Deployment;
+  vrfCoordinator: Deployment;
+}> => {
+  const signers = await ethers.getSigners();
+  const owner = signers[9];
+  const LinkToken: Deployment = await deployments.get('LinkToken');
+  const VRFCoordinatorMock: Deployment = await deployments.get(
+    'VRFCoordinatorMock',
+  );
+
+  const GenesisRevealDeployment: Deployment = await deployments.get(
+    'GenesisReveal',
+  );
+  const GenesisReveal = await ethers.getContractAt(
+    'GenesisReveal',
+    GenesisRevealDeployment.address,
+    owner,
+  );
+
+  return {
+    shuffler: GenesisReveal,
+    linkToken: LinkToken,
+    vrfCoordinator: VRFCoordinatorMock,
   };
 };
 
@@ -82,4 +110,36 @@ export const generateAirdroppedWallet = async (
     to: wallet.address,
     count: count,
   }));
+};
+
+/**
+ * Generate the seed for the shuffler contract
+ * @param shufflerContract The shuffler contract
+ * @param owner Owner of the contract
+ * @param oracle The oracle for the VRFCoordinator
+ * @param coordinatorMockAddress Mock address
+ * @param randomNumber Random number to use
+ */
+export const generateSeed = async (
+  shuffler: GenesisReveal,
+  owner: SignerWithAddress,
+  oracle: SignerWithAddress,
+  coordinatorMockAddress: string,
+  randomNumber: number = Math.floor(Math.random() * 100000),
+) => {
+  const randomizationTx = await shuffler.connect(owner).generateSeed();
+  const randomizationReceipt: ContractReceipt = await randomizationTx.wait();
+  const requestId = randomizationReceipt.events?.find(
+    (x: any) => x.event === 'RequestedRandomNumber',
+  )?.args![0];
+  const vrfCoordinatorMock = await ethers.getContractAt(
+    'VRFCoordinatorMock',
+    coordinatorMockAddress,
+    oracle,
+  );
+  return await vrfCoordinatorMock.callBackWithRandomness(
+    requestId,
+    randomNumber,
+    shuffler.address,
+  );
 };

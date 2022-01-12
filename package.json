@@ -11,7 +11,8 @@
     "deploy": "hardhat deploy",
     "node:local": "hardhat node --network hardhat",
     "test": "hardhat test --logs --deploy-fixture --network localhost test/test-genesis.ts",
-    "test:full-mint": "hardhat test --deploy-fixture --network localhost test/test-mint.ts"
+    "test:full-mint": "hardhat test --deploy-fixture --network localhost test/test-mint.ts",
+    "test:shuffler": "hardhat test --deploy-fixture --network localhost test/test-shuffler.ts"
   },
   "repository": {
     "type": "git",
